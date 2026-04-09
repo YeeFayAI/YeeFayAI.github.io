@@ -1,6 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>关于作品集</title>
+    <url>/2026/04/09/%E5%85%B3%E4%BA%8E%E4%BD%9C%E5%93%81%E9%9B%86/</url>
+    <content><![CDATA[作品集这里展示我的个人项目与作品。
+包括：
+
+独立开发的小工具
+有趣的编程项目
+其他创意作品
+
+每个作品都记录了从想法到实现的过程。
+]]></content>
+      <categories>
+        <category>作品集</category>
+      </categories>
+  </entry>
+  <entry>
     <title>什么是Agent</title>
     <url>/2026/04/09/%E4%BB%80%E4%B9%88%E6%98%AFAgent/</url>
     <content><![CDATA[Agent 学习笔记这个分类记录我在 AI Agent 领域的学习过程。
@@ -15,22 +31,6 @@ MCP、Tool Use 等前沿技术
 ]]></content>
       <categories>
         <category>Agent学习笔记</category>
-      </categories>
-  </entry>
-  <entry>
-    <title>关于作品集</title>
-    <url>/2026/04/09/%E5%85%B3%E4%BA%8E%E4%BD%9C%E5%93%81%E9%9B%86/</url>
-    <content><![CDATA[作品集这里展示我的个人项目与作品。
-包括：
-
-独立开发的小工具
-有趣的编程项目
-其他创意作品
-
-每个作品都记录了从想法到实现的过程。
-]]></content>
-      <categories>
-        <category>作品集</category>
       </categories>
   </entry>
 </search>

@@ -1,0 +1,506 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>04_框架与工具 | BergAIhub</title><meta name="author" content="BergAIhub"><meta name="copyright" content="BergAIhub"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#F2EDF7"><meta name="description" content="Agent框架与工具本文介绍主流Agent开发框架和工具，帮助开发者选择适合的技术栈。 1. LangChain &#x2F; LangGraph核心概念LangChain 是最流行的LLM应用开发框架，核心组件：    概念 说明    Chain 将多个组件串联成序列，实现复杂工作流   Prompt Template 动态生成提示词的模板系统   Memory 对话历史和上下文管理   Re">
+<meta property="og:type" content="article">
+<meta property="og:title" content="04_框架与工具">
+<meta property="og:url" content="https://bergaihub.github.io/2026/04/11/04_%E6%A1%86%E6%9E%B6%E4%B8%8E%E5%B7%A5%E5%85%B7/index.html">
+<meta property="og:site_name" content="BergAIhub">
+<meta property="og:description" content="Agent框架与工具本文介绍主流Agent开发框架和工具，帮助开发者选择适合的技术栈。 1. LangChain &#x2F; LangGraph核心概念LangChain 是最流行的LLM应用开发框架，核心组件：    概念 说明    Chain 将多个组件串联成序列，实现复杂工作流   Prompt Template 动态生成提示词的模板系统   Memory 对话历史和上下文管理   Re">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://bergaihub.github.io/img/avatar.jpg">
+<meta property="article:published_time" content="2026-04-10T17:10:15.000Z">
+<meta property="article:modified_time" content="2026-04-10T17:10:15.308Z">
+<meta property="article:author" content="BergAIhub">
+<meta property="article:tag" content="Agent开发,人工智能,AI助手,大语言模型">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://bergaihub.github.io/img/avatar.jpg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "04_框架与工具",
+  "url": "https://bergaihub.github.io/2026/04/11/04_%E6%A1%86%E6%9E%B6%E4%B8%8E%E5%B7%A5%E5%85%B7/",
+  "image": "https://bergaihub.github.io/img/avatar.jpg",
+  "datePublished": "2026-04-10T17:10:15.000Z",
+  "dateModified": "2026-04-10T17:10:15.308Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "BergAIhub",
+      "url": "https://bergaihub.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://bergaihub.github.io/2026/04/11/04_%E6%A1%86%E6%9E%B6%E4%B8%8E%E5%B7%A5%E5%85%B7/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.5.4"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.1.0/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#3d2b1f')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#F2EDF7')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '04_框架与工具',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><style>
+/* 导航菜单字体放大 */
+#nav .menus_item a {
+  font-size: 18px !important;
+}
+/* 搜索按钮放大 */
+#search-button .site-page {
+  font-size: 18px !important;
+}
+/* 公告栏图标改为紫色 */
+.card-announcement .item-headline i {
+  color: #7B6B8A !important;
+}
+/* 关于页面视频背景 */
+.about-video-header {
+  position: relative;
+  width: 100%;
+  height: 60vh;
+  overflow: hidden;
+  margin-top: -60px;
+  margin-bottom: 20px;
+}
+.about-video-header video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.about-video-header .video-title {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  font-size: 32px;
+  font-weight: 700;
+  text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+  z-index: 10;
+}
+.about-video-header::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.3);
+}
+</style>
+<meta name="generator" content="Hexo 8.1.1"></head><body><div class="bg-animation" id="web_bg" style="background-color: #F8F5FA;"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/agent-notes/"><i class="fa-fw fas fa-robot"></i><span> Agent学习笔记</span></a></div><div class="menus_item"><a class="site-page" href="/categories/portfolio/"><i class="fa-fw fas fa-star"></i><span> 作品集</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于我</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">BergAIhub</span></a><a class="nav-page-title" href="/"><span class="site-name">04_框架与工具</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/agent-notes/"><i class="fa-fw fas fa-robot"></i><span> Agent学习笔记</span></a></div><div class="menus_item"><a class="site-page" href="/categories/portfolio/"><i class="fa-fw fas fa-star"></i><span> 作品集</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于我</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">04_框架与工具</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-04-10T17:10:15.000Z" title="发表于 2026-04-11 01:10:15">2026-04-11</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-10T17:10:15.308Z" title="更新于 2026-04-11 01:10:15">2026-04-11</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/agent-notes/">Agent学习笔记</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><h1 id="Agent框架与工具"><a href="#Agent框架与工具" class="headerlink" title="Agent框架与工具"></a>Agent框架与工具</h1><p>本文介绍主流Agent开发框架和工具，帮助开发者选择适合的技术栈。</p>
+<h2 id="1-LangChain-LangGraph"><a href="#1-LangChain-LangGraph" class="headerlink" title="1. LangChain &#x2F; LangGraph"></a>1. LangChain &#x2F; LangGraph</h2><h3 id="核心概念"><a href="#核心概念" class="headerlink" title="核心概念"></a>核心概念</h3><p><strong>LangChain</strong> 是最流行的LLM应用开发框架，核心组件：</p>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Chain</strong></td>
+<td>将多个组件串联成序列，实现复杂工作流</td>
+</tr>
+<tr>
+<td><strong>Prompt Template</strong></td>
+<td>动态生成提示词的模板系统</td>
+</tr>
+<tr>
+<td><strong>Memory</strong></td>
+<td>对话历史和上下文管理</td>
+</tr>
+<tr>
+<td><strong>Retriever</strong></td>
+<td>从向量数据库检索相关信息</td>
+</tr>
+<tr>
+<td><strong>Tool</strong></td>
+<td>Agent可调用的外部功能接口</td>
+</tr>
+<tr>
+<td><strong>Agent</strong></td>
+<td>使用LLM决定行动序列的智能体</td>
+</tr>
+</tbody></table>
+<p><strong>LangGraph</strong> 是LangChain团队的Agent编排框架，核心抽象：</p>
+<ul>
+<li><strong>StateGraph</strong>：基于状态的图结构</li>
+<li><strong>Node</strong>：执行具体操作的节点</li>
+<li><strong>Edge</strong>：节点间的转换条件</li>
+<li><strong>Conditional Edge</strong>：根据状态动态路由</li>
+</ul>
+<h3 id="Agent构建方式"><a href="#Agent构建方式" class="headerlink" title="Agent构建方式"></a>Agent构建方式</h3><p><strong>方式一：AgentExecutor（传统方式）</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langchain.agents <span class="keyword">import</span> create_react_agent, AgentExecutor</span><br><span class="line"><span class="keyword">from</span> langchain.tools <span class="keyword">import</span> Tool</span><br><span class="line"></span><br><span class="line">tools = [</span><br><span class="line">    Tool(name=<span class="string">&quot;Calculator&quot;</span>, func=calculator, description=<span class="string">&quot;用于数学计算&quot;</span>),</span><br><span class="line">    Tool(name=<span class="string">&quot;Search&quot;</span>, func=search, description=<span class="string">&quot;搜索互联网信息&quot;</span>)</span><br><span class="line">]</span><br><span class="line"></span><br><span class="line">agent = create_react_agent(llm, tools, prompt)</span><br><span class="line">agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=<span class="literal">True</span>)</span><br><span class="line">result = agent_executor.invoke(&#123;<span class="string">&quot;input&quot;</span>: <span class="string">&quot;计算25的平方根&quot;</span>&#125;)</span><br></pre></td></tr></table></figure>
+
+<p><strong>方式二：LangGraph（推荐方式）</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> StateGraph, END</span><br><span class="line"><span class="keyword">from</span> typing <span class="keyword">import</span> TypedDict</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">AgentState</span>(<span class="title class_ inherited__">TypedDict</span>):</span><br><span class="line">    messages: <span class="built_in">list</span></span><br><span class="line">    next_action: <span class="built_in">str</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">think</span>(<span class="params">state: AgentState</span>) -&gt; AgentState:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;推理节点：决定下一步行动&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> state</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">act</span>(<span class="params">state: AgentState</span>) -&gt; AgentState:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;执行节点：调用工具&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> state</span><br><span class="line"></span><br><span class="line">workflow = StateGraph(AgentState)</span><br><span class="line">workflow.add_node(<span class="string">&quot;think&quot;</span>, think)</span><br><span class="line">workflow.add_node(<span class="string">&quot;act&quot;</span>, act)</span><br><span class="line">workflow.add_edge(<span class="string">&quot;think&quot;</span>, <span class="string">&quot;act&quot;</span>)</span><br><span class="line">workflow.add_conditional_edges(<span class="string">&quot;act&quot;</span>, <span class="keyword">lambda</span> s: s[<span class="string">&quot;next_action&quot;</span>], &#123;<span class="string">&quot;continue&quot;</span>: <span class="string">&quot;think&quot;</span>, <span class="string">&quot;finish&quot;</span>: END&#125;)</span><br><span class="line"></span><br><span class="line">app = workflow.<span class="built_in">compile</span>()</span><br></pre></td></tr></table></figure>
+
+<h3 id="优缺点分析"><a href="#优缺点分析" class="headerlink" title="优缺点分析"></a>优缺点分析</h3><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>学习曲线</td>
+<td>文档丰富，社区活跃</td>
+<td>概念较多，入门需时间</td>
+</tr>
+<tr>
+<td>灵活性</td>
+<td>组件化设计，可自由组合</td>
+<td>过度抽象增加复杂度</td>
+</tr>
+<tr>
+<td>生产就绪</td>
+<td>支持流式输出、错误处理</td>
+<td>版本迭代快，API变化频繁</td>
+</tr>
+<tr>
+<td>生态系统</td>
+<td>集成100+工具和服务</td>
+<td>依赖较多，bundle较大</td>
+</tr>
+</tbody></table>
+<p><strong>适用场景</strong>：复杂RAG应用、精细控制Agent工作流、企业级生产环境。</p>
+<hr>
+<h2 id="2-AutoGPT-BabyAGI"><a href="#2-AutoGPT-BabyAGI" class="headerlink" title="2. AutoGPT &#x2F; BabyAGI"></a>2. AutoGPT &#x2F; BabyAGI</h2><h3 id="自主Agent先驱"><a href="#自主Agent先驱" class="headerlink" title="自主Agent先驱"></a>自主Agent先驱</h3><p><strong>AutoGPT</strong>（2023年3月）是第一个真正意义上的自主Agent：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">核心循环：</span><br><span class="line">目标(Goals) → 思考(Think) → 决定(Decide) → 执行(Act) → 评估(Evaluate) → 循环</span><br></pre></td></tr></table></figure>
+
+<p><strong>BabyAGI</strong> 专注于任务驱动，三大组件：</p>
+<ul>
+<li><strong>Task Execution Agent</strong>：执行当前任务</li>
+<li><strong>Task Enrichment</strong>：存储结果到向量库</li>
+<li><strong>Task Creation Agent</strong>：基于目标生成新任务</li>
+</ul>
+<h3 id="架构对比"><a href="#架构对比" class="headerlink" title="架构对比"></a>架构对比</h3><table>
+<thead>
+<tr>
+<th>特性</th>
+<th>AutoGPT</th>
+<th>BabyAGI</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>自主程度</strong></td>
+<td>高度自主，可运行数小时</td>
+<td>相对保守，任务驱动</td>
+</tr>
+<tr>
+<td><strong>记忆系统</strong></td>
+<td>本地文件 + 向量存储</td>
+<td>向量存储为主</td>
+</tr>
+<tr>
+<td><strong>资源消耗</strong></td>
+<td>较高</td>
+<td>相对较低</td>
+</tr>
+</tbody></table>
+<p><strong>核心创新</strong>：实现”目标→任务分解→执行”闭环，引入自我反思能力。</p>
+<p><strong>局限性</strong>：容易无限循环、成本难控、质量不稳定。</p>
+<hr>
+<h2 id="3-CrewAI"><a href="#3-CrewAI" class="headerlink" title="3. CrewAI"></a>3. CrewAI</h2><h3 id="多Agent协作"><a href="#多Agent协作" class="headerlink" title="多Agent协作"></a>多Agent协作</h3><p>CrewAI专注于多Agent协作系统，让专业Agent协同完成任务：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">架构：Crew(团队)</span><br><span class="line">├── Agent 1 (研究员)  ─┐</span><br><span class="line">├── Agent 2 (分析师)  ─┼── Task Pipeline</span><br><span class="line">└── Agent 3 (撰稿人)  ─┘</span><br></pre></td></tr></table></figure>
+
+<h3 id="角色定义与任务"><a href="#角色定义与任务" class="headerlink" title="角色定义与任务"></a>角色定义与任务</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> crewai <span class="keyword">import</span> Agent, Task, Crew</span><br><span class="line"></span><br><span class="line">researcher = Agent(</span><br><span class="line">    role=<span class="string">&quot;高级研究员&quot;</span>,</span><br><span class="line">    goal=<span class="string">&quot;深入研究主题，收集全面信息&quot;</span>,</span><br><span class="line">    tools=[search_tool, scrape_tool]</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">analyst = Agent(</span><br><span class="line">    role=<span class="string">&quot;数据分析师&quot;</span>,</span><br><span class="line">    goal=<span class="string">&quot;分析数据，发现洞察&quot;</span>,</span><br><span class="line">    allow_delegation=<span class="literal">True</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">writer = Agent(</span><br><span class="line">    role=<span class="string">&quot;技术撰稿人&quot;</span>,</span><br><span class="line">    goal=<span class="string">&quot;撰写清晰、有吸引力的内容&quot;</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建任务流程</span></span><br><span class="line">tasks = [</span><br><span class="line">    Task(description=<span class="string">&quot;研究AI Agent最新发展&quot;</span>, agent=researcher),</span><br><span class="line">    Task(description=<span class="string">&quot;分析研究结果&quot;</span>, agent=analyst, context=[tasks[<span class="number">0</span>]]),</span><br><span class="line">    Task(description=<span class="string">&quot;撰写技术文章&quot;</span>, agent=writer, context=[tasks[<span class="number">1</span>]])</span><br><span class="line">]</span><br><span class="line"></span><br><span class="line">crew = Crew(agents=[researcher, analyst, writer], tasks=tasks)</span><br><span class="line">result = crew.kickoff()</span><br></pre></td></tr></table></figure>
+
+<h3 id="协作模式"><a href="#协作模式" class="headerlink" title="协作模式"></a>协作模式</h3><table>
+<thead>
+<tr>
+<th>模式</th>
+<th>描述</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>顺序执行</strong></td>
+<td>任务按顺序依次执行</td>
+<td>流水线工作流</td>
+</tr>
+<tr>
+<td><strong>层级管理</strong></td>
+<td>Manager分配任务</td>
+<td>复杂项目管理</td>
+</tr>
+<tr>
+<td><strong>共识决策</strong></td>
+<td>Agent投票决定</td>
+<td>多角度判断</td>
+</tr>
+<tr>
+<td><strong>自主协作</strong></td>
+<td>Agent自主沟通</td>
+<td>开放式问题解决</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="4-MetaGPT"><a href="#4-MetaGPT" class="headerlink" title="4. MetaGPT"></a>4. MetaGPT</h2><h3 id="软件公司模拟"><a href="#软件公司模拟" class="headerlink" title="软件公司模拟"></a>软件公司模拟</h3><p>MetaGPT将软件公司角色分工引入Agent系统：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">产品经理(PRD) → 架构师(系统设计) → 项目经理(任务分解) → 工程师(代码实现) → QA(测试验证)</span><br></pre></td></tr></table></figure>
+
+<h3 id="SOP工作流"><a href="#SOP工作流" class="headerlink" title="SOP工作流"></a>SOP工作流</h3><p>**标准操作流程（SOP）**是MetaGPT的核心创新：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> metagpt.roles <span class="keyword">import</span> ProductManager, Architect, Engineer, QaEngineer</span><br><span class="line"><span class="keyword">from</span> metagpt.team <span class="keyword">import</span> Team</span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">create_software</span>():</span><br><span class="line">    team = Team()</span><br><span class="line">    team.hire([ProductManager(), Architect(), Engineer(), QaEngineer()])</span><br><span class="line">    <span class="keyword">await</span> team.run(idea=<span class="string">&quot;开发一个待办事项应用&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 产出物：PRD、系统设计、API文档、源代码、测试用例</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>SOP价值对比</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>传统Agent</th>
+<th>MetaGPT SOP</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>随机性强，输出不稳定</td>
+<td>流程标准化，输出规范</td>
+</tr>
+<tr>
+<td>缺乏验证环节</td>
+<td>多角色交叉验证</td>
+</tr>
+<tr>
+<td>单一Agent易出错</td>
+<td>多角色分工协作</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="5-其他重要框架"><a href="#5-其他重要框架" class="headerlink" title="5. 其他重要框架"></a>5. 其他重要框架</h2><h3 id="Microsoft-AutoGen"><a href="#Microsoft-AutoGen" class="headerlink" title="Microsoft AutoGen"></a>Microsoft AutoGen</h3><p><strong>多Agent对话框架</strong>，特色功能：</p>
+<ul>
+<li><strong>对话模式</strong>：Agent间自然语言协作</li>
+<li><strong>代码执行</strong>：内置沙箱环境</li>
+<li><strong>人类介入</strong>：支持人在循环中参与</li>
+<li><strong>群聊模式</strong>：多Agent群组讨论</li>
+</ul>
+<h3 id="OpenAI-Assistants-API"><a href="#OpenAI-Assistants-API" class="headerlink" title="OpenAI Assistants API"></a>OpenAI Assistants API</h3><p><strong>托管Agent服务</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>优势</th>
+<th>限制</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>完全托管，无需维护</td>
+<td>依赖OpenAI生态</td>
+</tr>
+<tr>
+<td>内置代码解释器</td>
+<td>自定义能力有限</td>
+</tr>
+<tr>
+<td>持久化对话状态</td>
+<td>成本较高</td>
+</tr>
+</tbody></table>
+<h3 id="Claude-MCP"><a href="#Claude-MCP" class="headerlink" title="Claude MCP"></a>Claude MCP</h3><p><strong>标准化工具连接协议</strong>，核心概念：</p>
+<ul>
+<li><strong>Resources</strong>：可读取的数据源</li>
+<li><strong>Tools</strong>：可调用的功能</li>
+<li><strong>Prompts</strong>：预定义的提示模板</li>
+</ul>
+<p><strong>MCP价值</strong>：统一工具接口标准、一次开发多端使用、降低Agent开发门槛。</p>
+<hr>
+<h2 id="6-框架选型指南"><a href="#6-框架选型指南" class="headerlink" title="6. 框架选型指南"></a>6. 框架选型指南</h2><h3 id="框架对比"><a href="#框架对比" class="headerlink" title="框架对比"></a>框架对比</h3><table>
+<thead>
+<tr>
+<th>框架</th>
+<th>定位</th>
+<th>多Agent</th>
+<th>学习曲线</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>LangChain</strong></td>
+<td>通用框架</td>
+<td>支持</td>
+<td>中等</td>
+<td>企业应用、RAG</td>
+</tr>
+<tr>
+<td><strong>LangGraph</strong></td>
+<td>工作流编排</td>
+<td>支持</td>
+<td>较高</td>
+<td>复杂Agent系统</td>
+</tr>
+<tr>
+<td><strong>AutoGPT</strong></td>
+<td>自主Agent</td>
+<td>单体</td>
+<td>低</td>
+<td>实验探索</td>
+</tr>
+<tr>
+<td><strong>CrewAI</strong></td>
+<td>团队协作</td>
+<td>原生</td>
+<td>低</td>
+<td>内容创作、研究</td>
+</tr>
+<tr>
+<td><strong>MetaGPT</strong></td>
+<td>软件开发</td>
+<td>原生</td>
+<td>中</td>
+<td>代码生成</td>
+</tr>
+<tr>
+<td><strong>AutoGen</strong></td>
+<td>对话协作</td>
+<td>原生</td>
+<td>中</td>
+<td>研究实验</td>
+</tr>
+<tr>
+<td><strong>Assistants API</strong></td>
+<td>托管服务</td>
+<td>单体</td>
+<td>低</td>
+<td>快速原型</td>
+</tr>
+</tbody></table>
+<h3 id="选型决策"><a href="#选型决策" class="headerlink" title="选型决策"></a>选型决策</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">完全托管服务？ → OpenAI Assistants API</span><br><span class="line">代码生成场景？ → MetaGPT</span><br><span class="line">多Agent协作 + 角色分工明确？ → CrewAI</span><br><span class="line">多Agent协作 + 需要对话协商？ → AutoGen</span><br><span class="line">精细控制工作流？ → LangGraph</span><br><span class="line">快速原型开发？ → LangChain AgentExecutor</span><br><span class="line">学习研究？ → BabyAGI / AutoGPT</span><br></pre></td></tr></table></figure>
+
+<h3 id="组合使用建议"><a href="#组合使用建议" class="headerlink" title="组合使用建议"></a>组合使用建议</h3><p><strong>企业级Agent系统</strong>：LangGraph + LangChain + MCP + LangSmith</p>
+<p><strong>内容生产平台</strong>：CrewAI + LangChain Tools + 向量数据库</p>
+<p><strong>代码助手</strong>：MetaGPT + GitHub MCP + 自定义工具</p>
+<hr>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>框架选择需考虑：<strong>需求匹配度</strong>、<strong>团队能力</strong>、<strong>生产就绪度</strong>、<strong>社区生态</strong>、<strong>长期维护</strong>。建议从简单场景入手，逐步深入，在实践中形成适合团队的选型标准。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://bergaihub.github.io">BergAIhub</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://bergaihub.github.io/2026/04/11/04_%E6%A1%86%E6%9E%B6%E4%B8%8E%E5%B7%A5%E5%85%B7/">https://bergaihub.github.io/2026/04/11/04_%E6%A1%86%E6%9E%B6%E4%B8%8E%E5%B7%A5%E5%85%B7/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://bergaihub.github.io" target="_blank">BergAIhub</a>！</span></div></div><div class="tag_share"><div class="post-share"><div class="social-share" data-image="/img/avatar.jpg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/04/11/02_%E6%A0%B8%E5%BF%83%E6%9E%B6%E6%9E%84/" title="02_核心架构"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">02_核心架构</div></div><div class="info-2"><div class="info-item-1">Agent 核心架构 架构决定Agent的能力边界与行为模式  一、Agent架构概述1.1 基本范式：感知-决策-行动循环1234567891011┌─────────────────────────────────────────────────────────────┐│                      Agent 主循环                            ││                                                              ││    ┌──────────┐    ┌──────────┐    ┌──────────┐            ││    │  感知    │───▶│  决策    │───▶│  行动    │            ││    │Perceive  │    │  Decide  │    │   Act    │            ││    └──────────┘    └──────────┘    └──────────┘     ...</div></div></div></a><a class="pagination-related" href="/2026/04/11/05_%E5%BA%94%E7%94%A8%E5%AE%9E%E8%B7%B5/" title="05_应用实践"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">05_应用实践</div></div><div class="info-2"><div class="info-item-1">Agent 应用实践本文档系统介绍 Agent 在各领域的实际应用，涵盖代码助手、数据分析、自动化工作流、研究助手、客服对话、游戏等场景，并提供从零构建简单 Agent 的实战案例。  1. 代码助手代码助手是 Agent 技术最成熟的应用领域之一，通过理解开发者意图，提供智能代码补全、生成、重构和调试能力。 1.1 CursorCursor 是基于 AI 的代码编辑器，深度集成了大语言模型能力。 核心特性：  代码补全：基于上下文的智能补全，预测开发者意图 代码生成：通过自然语言描述生成代码片段 代码解释：解释复杂代码逻辑，帮助理解遗留代码 重构建议：识别代码异味并提供重构建议 Chat 模式：与 AI 对话解决编程问题  技术架构： 12345用户输入 → 上下文收集 → 模型推理 → 代码生成 → 后处理 → 输出                ↓         [文件索引]         [符号分析]         [依赖图谱]  1.2 GitHub Copilot WorkspaceGitHub Copilot Workspace 是 GitHub 推出的 AI...</div></div></div></a></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">BergAIhub</div><div class="author-info-description">Agent is all you need</div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/BergAIhub"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/BergAIhub" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content"><div style="text-align:center;padding:10px;background:linear-gradient(135deg,rgba(123,107,138,0.15),rgba(168,152,181,0.1));border-radius:8px;margin-bottom:8px;"><div style="font-size:11px;color:#000;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;font-weight:700;">Beijing · UTC+8</div><div id="beijing-time" style="font-family:monospace;font-size:18px;letter-spacing:2px;color:#333;font-weight:600;"></div></div><script>function updateTime(){const now=new Date(Date.now()+8*3600*1000);const y=now.getUTCFullYear();const m=String(now.getUTCMonth()+1).padStart(2,"0");const d=String(now.getUTCDate()).padStart(2,"0");const h=String(now.getUTCHours()).padStart(2,"0");const min=String(now.getUTCMinutes()).padStart(2,"0");const s=String(now.getUTCSeconds()).padStart(2,"0");const el=document.getElementById("beijing-time");if(el)el.innerText=`${y}.${m}.${d} ${h}:${min}:${s}`;}updateTime();setInterval(updateTime,1000);</script>你好，我是Berg，欢迎来到我的Blog！</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#Agent%E6%A1%86%E6%9E%B6%E4%B8%8E%E5%B7%A5%E5%85%B7"><span class="toc-number">1.</span> <span class="toc-text">Agent框架与工具</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-LangChain-LangGraph"><span class="toc-number">1.1.</span> <span class="toc-text">1. LangChain &#x2F; LangGraph</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%A6%82%E5%BF%B5"><span class="toc-number">1.1.1.</span> <span class="toc-text">核心概念</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Agent%E6%9E%84%E5%BB%BA%E6%96%B9%E5%BC%8F"><span class="toc-number">1.1.2.</span> <span class="toc-text">Agent构建方式</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BC%98%E7%BC%BA%E7%82%B9%E5%88%86%E6%9E%90"><span class="toc-number">1.1.3.</span> <span class="toc-text">优缺点分析</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-AutoGPT-BabyAGI"><span class="toc-number">1.2.</span> <span class="toc-text">2. AutoGPT &#x2F; BabyAGI</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%87%AA%E4%B8%BBAgent%E5%85%88%E9%A9%B1"><span class="toc-number">1.2.1.</span> <span class="toc-text">自主Agent先驱</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%9E%B6%E6%9E%84%E5%AF%B9%E6%AF%94"><span class="toc-number">1.2.2.</span> <span class="toc-text">架构对比</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-CrewAI"><span class="toc-number">1.3.</span> <span class="toc-text">3. CrewAI</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%A4%9AAgent%E5%8D%8F%E4%BD%9C"><span class="toc-number">1.3.1.</span> <span class="toc-text">多Agent协作</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%A7%92%E8%89%B2%E5%AE%9A%E4%B9%89%E4%B8%8E%E4%BB%BB%E5%8A%A1"><span class="toc-number">1.3.2.</span> <span class="toc-text">角色定义与任务</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8D%8F%E4%BD%9C%E6%A8%A1%E5%BC%8F"><span class="toc-number">1.3.3.</span> <span class="toc-text">协作模式</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-MetaGPT"><span class="toc-number">1.4.</span> <span class="toc-text">4. MetaGPT</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%BD%AF%E4%BB%B6%E5%85%AC%E5%8F%B8%E6%A8%A1%E6%8B%9F"><span class="toc-number">1.4.1.</span> <span class="toc-text">软件公司模拟</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#SOP%E5%B7%A5%E4%BD%9C%E6%B5%81"><span class="toc-number">1.4.2.</span> <span class="toc-text">SOP工作流</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-%E5%85%B6%E4%BB%96%E9%87%8D%E8%A6%81%E6%A1%86%E6%9E%B6"><span class="toc-number">1.5.</span> <span class="toc-text">5. 其他重要框架</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Microsoft-AutoGen"><span class="toc-number">1.5.1.</span> <span class="toc-text">Microsoft AutoGen</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#OpenAI-Assistants-API"><span class="toc-number">1.5.2.</span> <span class="toc-text">OpenAI Assistants API</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Claude-MCP"><span class="toc-number">1.5.3.</span> <span class="toc-text">Claude MCP</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-%E6%A1%86%E6%9E%B6%E9%80%89%E5%9E%8B%E6%8C%87%E5%8D%97"><span class="toc-number">1.6.</span> <span class="toc-text">6. 框架选型指南</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A1%86%E6%9E%B6%E5%AF%B9%E6%AF%94"><span class="toc-number">1.6.1.</span> <span class="toc-text">框架对比</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%80%89%E5%9E%8B%E5%86%B3%E7%AD%96"><span class="toc-number">1.6.2.</span> <span class="toc-text">选型决策</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BB%84%E5%90%88%E4%BD%BF%E7%94%A8%E5%BB%BA%E8%AE%AE"><span class="toc-number">1.6.3.</span> <span class="toc-text">组合使用建议</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93"><span class="toc-number">1.7.</span> <span class="toc-text">总结</span></a></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/11/03_%E5%85%B3%E9%94%AE%E6%8A%80%E6%9C%AF/" title="03_关键技术">03_关键技术</a><time datetime="2026-04-10T17:10:15.000Z" title="发表于 2026-04-11 01:10:15">2026-04-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/11/01_%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5/" title="01_基础概念">01_基础概念</a><time datetime="2026-04-10T17:10:15.000Z" title="发表于 2026-04-11 01:10:15">2026-04-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/11/06_%E5%89%8D%E6%B2%BF%E7%A0%94%E7%A9%B6/" title="06_前沿研究">06_前沿研究</a><time datetime="2026-04-10T17:10:15.000Z" title="发表于 2026-04-11 01:10:15">2026-04-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/11/05_%E5%BA%94%E7%94%A8%E5%AE%9E%E8%B7%B5/" title="05_应用实践">05_应用实践</a><time datetime="2026-04-10T17:10:15.000Z" title="发表于 2026-04-11 01:10:15">2026-04-11</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/11/04_%E6%A1%86%E6%9E%B6%E4%B8%8E%E5%B7%A5%E5%85%B7/" title="04_框架与工具">04_框架与工具</a><time datetime="2026-04-10T17:10:15.000Z" title="发表于 2026-04-11 01:10:15">2026-04-11</time></div></div></div></div></div></div></main><footer id="footer" style="background-image: url(/img/footer-bg.jpg);"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;BergAIhub</span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.5.4"></script><script src="/js/main.js?v=5.5.4"></script><div class="js-pjax"></div><script>
+if (window.location.pathname === '/about/') {
+  const header = document.querySelector('#page-header');
+  if (header) {
+    const videoHtml = `
+      <div class="about-video-header">
+        <video autoplay muted loop playsinline>
+          <source src="/img/about-bg.mp4" type="video/mp4">
+        </video>
+        <div class="video-title">关于我</div>
+      </div>
+    `;
+    header.insertAdjacentHTML('afterend', videoHtml);
+  }
+}
+</script>
+<script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索文章..." type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.5.4"></script></div></div></body></html>

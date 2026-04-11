@@ -1,152 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>LLM推理机制与Prompt Caching深度解析</title>
-    <url>/2026/04/11/LLM%E6%8E%A8%E7%90%86%E6%9C%BA%E5%88%B6%E4%B8%8EPrompt%20Caching%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/</url>
-    <content><![CDATA[LLM推理机制与Prompt Caching深度解析
-摘要：本文深入探讨LLM推理过程中的KV Cache技术原理，解析Prompt Caching API的设计思想与使用场景，并对比流式输出与传统输出方式的差异。理解这些底层机制，有助于Agent开发者更好地优化应用性能与成本。
-
-一、KV Cache：Transformer推理的核心优化什么是KV Cache在Transformer架构中，Attention机制需要计算Query、Key、Value三个矩阵。KV Cache的核心思想是：缓存已计算过的Key和Value矩阵，避免重复计算。
-推理过程的两个阶段LLM推理分为两个阶段，每个阶段都依赖KV Cache：
-
-
-
-阶段
-处理内容
-KV Cache行为
-
-
-
-预填充
-处理输入prompt
-一次性计算所有token的K&#x2F;V并缓存
-
-
-生成
-输出每个新token
-边输出边计算边缓存
-
-
-预填充阶段：模型将整个输入prompt的所有token一次性处理，每个token计算其K&#x2F;V矩阵并存入缓存。这一步是并行的，速度很快。
-生成阶段：模型逐个生成新token。每生成一个token，都需要查询前面所有token的K&#x2F;V（复用缓存），计算当前token的K&#x2F;V，存入缓存，然后输出。
-为什么生成阶段必须用KV Cache假设生成第100个输出token时：
-
-没有缓存：需要重新计算前99个token的K&#x2F;V矩阵 → 计算量爆炸
-有缓存：直接查表获取前99个token的K&#x2F;V → 高效
-
-这就是为什么KV Cache是Transformer推理的基本优化，每次推理都在使用。
-二、Prompt Caching：跨请求的缓存复用两层KV Cache的区别
-
-
-层次
-作用范围
-存在条件
-
-
-
-请求内KV Cache
-单次请求内
-始终存在，推理引擎自动使用
-
-
-跨请求KV Cache
-跨多个请求
-需要Prompt Caching功能支持
-
-
-没有Prompt Caching时，每次请求结束后KV Cache就被丢弃，下次请求需要重新计算。
-Prompt Caching的本质Prompt Caching &#x3D; 将KV Cache的能力通过API暴露给开发者
-请求1：处理2000个token，生成KV Cache        ↓没有Prompt Caching：丢弃有Prompt Caching：保存5分钟        ↓请求2（5分钟内，内容匹配）：直接复用请求1的KV Cache
-
-cache_control的使用方式开发者通过cache_control参数标记哪些内容块需要缓存：
-response = client.messages.create(    model=&quot;claude-sonnet-4-6&quot;,    system=[        &#123;            &quot;type&quot;: &quot;text&quot;,            &quot;text&quot;: &quot;稳定的系统提示词...&quot;,            &quot;cache_control&quot;: &#123;&quot;type&quot;: &quot;ephemeral&quot;&#125;  # 标记缓存        &#125;    ],    messages=[...])
-
-什么时候应该使用缓存缓存的价值取决于三个条件：
-
-
-
-条件
-说明
-
-
-
-内容稳定
-多次请求中内容不变
-
-
-内容较大
-token数量足够多（通常&gt;1000）
-
-
-会复用
-短时间内会被多次使用
-
-
-System Prompt最适合缓存：内容稳定、通常较大、每次请求都会发送。
-Messages通常不适合缓存：每轮对话都在变化，缓存命中率低。
-缓存能节省什么
-
-
-层面
-能否节省
-说明
-
-
-
-网络传输
-❌ 不能
-每次请求必须发送完整内容
-
-
-服务器计算
-✅ 能
-命中缓存时复用KV矩阵，减少90%成本
-
-
-响应延迟
-✅ 能
-跳过预填充阶段，响应更快
-
-
-三、流式输出：优化用户感知延迟传统方式 vs 流式输出传统非流式：服务器生成完整响应后一次性返回。用户等待整个生成过程结束才能看到内容。
-流式输出：每生成一个token就立即返回给客户端。用户几乎立刻开始看到内容。
-感知延迟对比非流式：用户点击发送 ────────────────→ 看到回复                   │←── 等待10秒 ──→│流式：用户点击发送 ─→ 看到第一个字                   │←─→│                  0.1秒
-
-代码实现差异# 非流式：一次性获取完整结果response = client.messages.create(...)print(response.content[0].text)# 流式：逐块处理with client.messages.stream(...) as stream:    for text in stream.text_stream:        print(text, end=&quot;&quot;, flush=True)
-
-流式输出让用户感觉模型在”实时思考”，体验更加自然流畅。
-四、Agent开发者需要掌握的层次作为Agent开发者，不需要深入理解推理引擎的实现细节，但需要了解API层面的优化技巧：
-必须掌握
-Agent架构设计（循环、状态、消息流）
-工具系统（注册、分发、权限）
-Prompt组装与缓存策略
-API使用技巧（Streaming, Tool Use, Caching）
-
-了解概念即可
-KV Cache是什么，解决什么问题
-Prompt Caching怎么用，什么时候用
-为什么Streaming能降低感知延迟
-
-不需要学习
-Continuous Batching实现细节
-PagedAttention内存管理
-Flash Attention CUDA优化
-模型训练（预训练、SFT、RLHF）
-
-总结
-KV Cache是Transformer推理的基本优化，每次推理都在使用，分为预填充和生成两个阶段
-Prompt Caching是API功能，让开发者能利用跨请求的KV Cache复用，节省服务器计算成本
-流式输出优化用户感知延迟，让用户更快看到响应内容
-网络传输无法通过缓存节省，每次请求必须发送完整内容
-Agent开发者应聚焦API使用技巧，推理引擎优化是厂商的责任
-
-理解这些机制，能帮助Agent开发者做出更好的架构决策和性能优化。
-]]></content>
-      <categories>
-        <category>Agent学习笔记</category>
-      </categories>
-  </entry>
-  <entry>
     <title>06_前沿研究</title>
     <url>/2026/04/11/06_%E5%89%8D%E6%B2%BF%E7%A0%94%E7%A9%B6/</url>
     <content><![CDATA[Agent 前沿研究本文档系统介绍 Agent 领域的前沿研究方向，涵盖多模态Agent、自我进化、安全对齐、评估基准等核心主题。
@@ -786,6 +640,715 @@ ToolBench: https://github.com/OpenBMB/ToolBench
       </categories>
   </entry>
   <entry>
+    <title>04_框架与工具</title>
+    <url>/2026/04/11/04_%E6%A1%86%E6%9E%B6%E4%B8%8E%E5%B7%A5%E5%85%B7/</url>
+    <content><![CDATA[Agent框架与工具本文介绍主流Agent开发框架和工具，帮助开发者选择适合的技术栈。
+1. LangChain &#x2F; LangGraph核心概念LangChain 是最流行的LLM应用开发框架，核心组件：
+
+
+
+概念
+说明
+
+
+
+Chain
+将多个组件串联成序列，实现复杂工作流
+
+
+Prompt Template
+动态生成提示词的模板系统
+
+
+Memory
+对话历史和上下文管理
+
+
+Retriever
+从向量数据库检索相关信息
+
+
+Tool
+Agent可调用的外部功能接口
+
+
+Agent
+使用LLM决定行动序列的智能体
+
+
+LangGraph 是LangChain团队的Agent编排框架，核心抽象：
+
+StateGraph：基于状态的图结构
+Node：执行具体操作的节点
+Edge：节点间的转换条件
+Conditional Edge：根据状态动态路由
+
+Agent构建方式方式一：AgentExecutor（传统方式）
+from langchain.agents import create_react_agent, AgentExecutorfrom langchain.tools import Tooltools = [    Tool(name=&quot;Calculator&quot;, func=calculator, description=&quot;用于数学计算&quot;),    Tool(name=&quot;Search&quot;, func=search, description=&quot;搜索互联网信息&quot;)]agent = create_react_agent(llm, tools, prompt)agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)result = agent_executor.invoke(&#123;&quot;input&quot;: &quot;计算25的平方根&quot;&#125;)
+
+方式二：LangGraph（推荐方式）
+from langgraph.graph import StateGraph, ENDfrom typing import TypedDictclass AgentState(TypedDict):    messages: list    next_action: strdef think(state: AgentState) -&gt; AgentState:    &quot;&quot;&quot;推理节点：决定下一步行动&quot;&quot;&quot;    return statedef act(state: AgentState) -&gt; AgentState:    &quot;&quot;&quot;执行节点：调用工具&quot;&quot;&quot;    return stateworkflow = StateGraph(AgentState)workflow.add_node(&quot;think&quot;, think)workflow.add_node(&quot;act&quot;, act)workflow.add_edge(&quot;think&quot;, &quot;act&quot;)workflow.add_conditional_edges(&quot;act&quot;, lambda s: s[&quot;next_action&quot;], &#123;&quot;continue&quot;: &quot;think&quot;, &quot;finish&quot;: END&#125;)app = workflow.compile()
+
+优缺点分析
+
+
+维度
+优点
+缺点
+
+
+
+学习曲线
+文档丰富，社区活跃
+概念较多，入门需时间
+
+
+灵活性
+组件化设计，可自由组合
+过度抽象增加复杂度
+
+
+生产就绪
+支持流式输出、错误处理
+版本迭代快，API变化频繁
+
+
+生态系统
+集成100+工具和服务
+依赖较多，bundle较大
+
+
+适用场景：复杂RAG应用、精细控制Agent工作流、企业级生产环境。
+
+2. AutoGPT &#x2F; BabyAGI自主Agent先驱AutoGPT（2023年3月）是第一个真正意义上的自主Agent：
+核心循环：目标(Goals) → 思考(Think) → 决定(Decide) → 执行(Act) → 评估(Evaluate) → 循环
+
+BabyAGI 专注于任务驱动，三大组件：
+
+Task Execution Agent：执行当前任务
+Task Enrichment：存储结果到向量库
+Task Creation Agent：基于目标生成新任务
+
+架构对比
+
+
+特性
+AutoGPT
+BabyAGI
+
+
+
+自主程度
+高度自主，可运行数小时
+相对保守，任务驱动
+
+
+记忆系统
+本地文件 + 向量存储
+向量存储为主
+
+
+资源消耗
+较高
+相对较低
+
+
+核心创新：实现”目标→任务分解→执行”闭环，引入自我反思能力。
+局限性：容易无限循环、成本难控、质量不稳定。
+
+3. CrewAI多Agent协作CrewAI专注于多Agent协作系统，让专业Agent协同完成任务：
+架构：Crew(团队)├── Agent 1 (研究员)  ─┐├── Agent 2 (分析师)  ─┼── Task Pipeline└── Agent 3 (撰稿人)  ─┘
+
+角色定义与任务from crewai import Agent, Task, Crewresearcher = Agent(    role=&quot;高级研究员&quot;,    goal=&quot;深入研究主题，收集全面信息&quot;,    tools=[search_tool, scrape_tool])analyst = Agent(    role=&quot;数据分析师&quot;,    goal=&quot;分析数据，发现洞察&quot;,    allow_delegation=True)writer = Agent(    role=&quot;技术撰稿人&quot;,    goal=&quot;撰写清晰、有吸引力的内容&quot;)# 创建任务流程tasks = [    Task(description=&quot;研究AI Agent最新发展&quot;, agent=researcher),    Task(description=&quot;分析研究结果&quot;, agent=analyst, context=[tasks[0]]),    Task(description=&quot;撰写技术文章&quot;, agent=writer, context=[tasks[1]])]crew = Crew(agents=[researcher, analyst, writer], tasks=tasks)result = crew.kickoff()
+
+协作模式
+
+
+模式
+描述
+适用场景
+
+
+
+顺序执行
+任务按顺序依次执行
+流水线工作流
+
+
+层级管理
+Manager分配任务
+复杂项目管理
+
+
+共识决策
+Agent投票决定
+多角度判断
+
+
+自主协作
+Agent自主沟通
+开放式问题解决
+
+
+
+4. MetaGPT软件公司模拟MetaGPT将软件公司角色分工引入Agent系统：
+产品经理(PRD) → 架构师(系统设计) → 项目经理(任务分解) → 工程师(代码实现) → QA(测试验证)
+
+SOP工作流**标准操作流程（SOP）**是MetaGPT的核心创新：
+from metagpt.roles import ProductManager, Architect, Engineer, QaEngineerfrom metagpt.team import Teamasync def create_software():    team = Team()    team.hire([ProductManager(), Architect(), Engineer(), QaEngineer()])    await team.run(idea=&quot;开发一个待办事项应用&quot;)# 产出物：PRD、系统设计、API文档、源代码、测试用例
+
+SOP价值对比：
+
+
+
+传统Agent
+MetaGPT SOP
+
+
+
+随机性强，输出不稳定
+流程标准化，输出规范
+
+
+缺乏验证环节
+多角色交叉验证
+
+
+单一Agent易出错
+多角色分工协作
+
+
+
+5. 其他重要框架Microsoft AutoGen多Agent对话框架，特色功能：
+
+对话模式：Agent间自然语言协作
+代码执行：内置沙箱环境
+人类介入：支持人在循环中参与
+群聊模式：多Agent群组讨论
+
+OpenAI Assistants API托管Agent服务：
+
+
+
+优势
+限制
+
+
+
+完全托管，无需维护
+依赖OpenAI生态
+
+
+内置代码解释器
+自定义能力有限
+
+
+持久化对话状态
+成本较高
+
+
+Claude MCP标准化工具连接协议，核心概念：
+
+Resources：可读取的数据源
+Tools：可调用的功能
+Prompts：预定义的提示模板
+
+MCP价值：统一工具接口标准、一次开发多端使用、降低Agent开发门槛。
+
+6. 框架选型指南框架对比
+
+
+框架
+定位
+多Agent
+学习曲线
+适用场景
+
+
+
+LangChain
+通用框架
+支持
+中等
+企业应用、RAG
+
+
+LangGraph
+工作流编排
+支持
+较高
+复杂Agent系统
+
+
+AutoGPT
+自主Agent
+单体
+低
+实验探索
+
+
+CrewAI
+团队协作
+原生
+低
+内容创作、研究
+
+
+MetaGPT
+软件开发
+原生
+中
+代码生成
+
+
+AutoGen
+对话协作
+原生
+中
+研究实验
+
+
+Assistants API
+托管服务
+单体
+低
+快速原型
+
+
+选型决策完全托管服务？ → OpenAI Assistants API代码生成场景？ → MetaGPT多Agent协作 + 角色分工明确？ → CrewAI多Agent协作 + 需要对话协商？ → AutoGen精细控制工作流？ → LangGraph快速原型开发？ → LangChain AgentExecutor学习研究？ → BabyAGI / AutoGPT
+
+组合使用建议企业级Agent系统：LangGraph + LangChain + MCP + LangSmith
+内容生产平台：CrewAI + LangChain Tools + 向量数据库
+代码助手：MetaGPT + GitHub MCP + 自定义工具
+
+总结框架选择需考虑：需求匹配度、团队能力、生产就绪度、社区生态、长期维护。建议从简单场景入手，逐步深入，在实践中形成适合团队的选型标准。
+]]></content>
+      <categories>
+        <category>Agent学习笔记</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>02_核心架构</title>
+    <url>/2026/04/11/02_%E6%A0%B8%E5%BF%83%E6%9E%B6%E6%9E%84/</url>
+    <content><![CDATA[Agent 核心架构
+架构决定Agent的能力边界与行为模式
+
+一、Agent架构概述1.1 基本范式：感知-决策-行动循环┌─────────────────────────────────────────────────────────────┐│                      Agent 主循环                            ││                                                              ││    ┌──────────┐    ┌──────────┐    ┌──────────┐            ││    │  感知    │───▶│  决策    │───▶│  行动    │            ││    │Perceive  │    │  Decide  │    │   Act    │            ││    └──────────┘    └──────────┘    └──────────┘            ││         ▲                                │                  ││         └────────────────────────────────┘                  ││                       反馈                                    │└─────────────────────────────────────────────────────────────┘
+
+1.2 Agent核心组件
+
+
+组件
+功能
+实现方式
+
+
+
+感知模块
+接收环境信息
+文本&#x2F;图像&#x2F;音频输入处理
+
+
+记忆模块
+存储历史信息
+短期记忆 + 长期记忆
+
+
+推理模块
+思考与规划
+LLM + Prompt Engineering
+
+
+工具模块
+执行具体操作
+Function Calling &#x2F; API调用
+
+
+行动模块
+输出结果
+文本生成 &#x2F; 工具调用
+
+
+
+二、ReAct架构（Reasoning + Acting）2.1 核心思想ReAct &#x3D; Reasoning（推理）+ Acting（行动）
+论文：ReAct: Synergizing Reasoning and Acting in Language Models (2022)
+┌─────────────────────────────────────────────────────────┐│                    ReAct 循环                            ││                                                          ││   Thought ──▶ Action ──▶ Observation ──▶ Thought        ││     │           │            │              │           ││   思考        执行         观察           再思考         ││                                                          │└─────────────────────────────────────────────────────────┘
+
+2.2 工作流程示例用户问题：北京今天天气怎么样？Thought: 我需要查询北京的天气信息Action: search(&quot;北京天气&quot;)Observation: 北京今天晴，气温15-25℃，空气质量良好Thought: 我已经获得了天气信息，可以回答用户了Action: finish(&quot;北京今天晴天，气温15-25℃，空气质量良好&quot;)
+
+2.3 ReAct代码实现class ReActAgent:    def __init__(self, llm, tools):        self.llm = llm        self.tools = &#123;tool.name: tool for tool in tools&#125;    def run(self, question: str, max_iterations: int = 10):        context = f&quot;Question: &#123;question&#125;\n&quot;        for _ in range(max_iterations):            response = self.llm.generate(context)            thought, action = self.parse_response(response)            context += f&quot;Thought: &#123;thought&#125;\nAction: &#123;action&#125;\n&quot;            if action.startswith(&quot;finish&quot;):                return self.extract_answer(action)            observation = self.execute_action(action)            context += f&quot;Observation: &#123;observation&#125;\n&quot;        return &quot;达到最大迭代次数&quot;
+
+2.4 ReAct优缺点
+
+
+优点
+缺点
+
+
+
+推理过程可解释
+迭代次数多时成本高
+
+
+灵活应对复杂任务
+容易陷入死循环
+
+
+可结合外部工具
+对Prompt质量敏感
+
+
+
+三、Plan-and-Execute架构3.1 核心思想先规划，后执行 —— 将复杂任务分解为子任务，逐一执行
+┌─────────────────────────────────────────────────────────┐│               Plan-and-Execute 架构                      ││                                                          ││   ┌─────────────┐         ┌─────────────┐              ││   │   Planner   │────────▶│  Executor   │              ││   │  (规划器)   │  计划    │  (执行器)   │              ││   └─────────────┘         └─────────────┘              ││         ▲                       │                       ││         └───────────────────────┘                       ││                   反馈与重规划                            │└─────────────────────────────────────────────────────────┘
+
+3.2 工作流程用户任务：帮我写一篇关于AI Agent的博客文章Step 1 - 规划阶段:  Plan:    1. 搜索AI Agent的最新发展动态    2. 整理Agent的核心概念和架构    3. 分析主流Agent框架    4. 撰写博客文章    5. 校对和润色Step 2 - 执行阶段:  Execute Task 1: 搜索完成，获得10篇相关文章  Execute Task 2: 整理完成，生成概念图谱  Execute Task 3: 分析完成，对比表格已生成  Execute Task 4: 文章初稿完成  Execute Task 5: 最终版本完成
+
+3.3 Plan-and-Execute代码实现class PlanAndExecuteAgent:    def __init__(self, planner_llm, executor_llm, tools):        self.planner = planner_llm        self.executor = executor_llm        self.tools = tools    def run(self, task: str):        plan = self.create_plan(task)        results = []        for step in plan:            result = self.execute_step(step)            results.append(result)            if self.need_replan(result):                plan = self.update_plan(plan, result)        return self.synthesize(results)    def execute_step(self, step: str):        executor = ReActAgent(self.executor, self.tools)        return executor.run(step)
+
+3.4 Plan-and-Execute vs ReAct
+
+
+维度
+ReAct
+Plan-and-Execute
+
+
+
+决策时机
+每步决策
+先整体规划
+
+
+适用任务
+探索性任务
+结构化任务
+
+
+效率
+较低
+较高
+
+
+灵活性
+高
+中等
+
+
+可预测性
+低
+高
+
+
+
+四、Reflexion架构（自我反思）4.1 核心思想执行 → 反思 → 改进 —— 从失败中学习
+论文：Reflexion: Language Agents with Verbal Reinforcement Learning (2023)
+┌─────────────────────────────────────────────────────────┐│                  Reflexion 架构                          ││                                                          ││   ┌────────┐    ┌────────┐    ┌────────┐              ││   │ Actor  │───▶│Evaluator│───▶│Reflector│             ││   │ 执行者 │    │ 评估者  │    │ 反思者  │             ││   └────────┘    └────────┘    └────────┘              ││       ▲              │              │                   ││       └──────────────┴──────────────┘                   ││              反馈与经验总结                               │└─────────────────────────────────────────────────────────┘
+
+4.2 工作流程class ReflexionAgent:    def __init__(self, actor, evaluator, reflector):        self.actor = actor        self.evaluator = evaluator        self.reflector = reflector        self.memory = []  # 存储反思经验    def run(self, task: str, max_trials: int = 3):        for trial in range(max_trials):            trajectory = self.actor.run(task, self.memory)            score, feedback = self.evaluator.evaluate(trajectory)            if score == 1.0:                return trajectory            reflection = self.reflector.reflect(task, trajectory, feedback)            self.memory.append(reflection)        return None
+
+4.3 反思示例任务：编写一个排序算法Trial 1:  Action: 编写冒泡排序  Result: 代码有bug，数组越界  Evaluation: 失败，得分 0.3  Reflection: 冒泡排序边界条件处理不当，需注意索引从0开始Trial 2:  Action: 修正冒泡排序边界条件  Result: 正确排序  Evaluation: 成功，得分 1.0
+
+
+五、多Agent协作架构5.1 为什么需要多Agent？
+
+
+单Agent局限
+多Agent优势
+
+
+
+角色混淆
+角色清晰分工
+
+
+上下文过长
+各自独立上下文
+
+
+难以并行
+可并行执行
+
+
+容易出错
+相互校验
+
+
+5.2 CAMEL架构Communicative Agents for “Mind” Exploration —— 角色扮演式协作
+┌─────────────────────────────────────────────────────────┐│                   CAMEL 架构                             ││                                                          ││   ┌─────────────┐              ┌─────────────┐         ││   │ AI User     │◀───请求─────│ AI Assistant │         ││   │ (用户角色)  │────回复────▶│ (助手角色)   │         ││   └─────────────┘              └─────────────┘         ││                                                          ││   通过角色扮演实现协作解决问题                             │└─────────────────────────────────────────────────────────┘
+
+5.3 MetaGPT架构软件公司模拟 —— 标准化工作流程
+┌─────────────────────────────────────────────────────────┐│                   MetaGPT 架构                           ││                                                          ││   ┌────────┐   ┌────────┐   ┌────────┐   ┌────────┐   ││   │Product │──▶│Architect│──▶│Project │──▶│Engineer│   ││   │Manager │   │        │   │Manager │   │        │   ││   └────────┘   └────────┘   └────────┘   └────────┘   ││       │            │            │            │         ││       ▼            ▼            ▼            ▼         ││   需求文档    架构设计    任务分配    代码实现         │└─────────────────────────────────────────────────────────┘
+
+5.4 多Agent协作模式
+
+
+模式
+描述
+适用场景
+
+
+
+顺序协作
+按流程依次执行
+软件开发流水线
+
+
+层级协作
+Manager分配任务给Worker
+复杂项目管理
+
+
+对等协作
+Agent间平等交流
+头脑风暴、讨论
+
+
+竞争协作
+多方案对比选择
+方案评审
+
+
+
+六、架构选择指南6.1 决策树               你的任务是什么类型？                     │     ┌───────────────┼───────────────┐     ▼               ▼               ▼ 探索性任务      结构化任务      复杂项目     │               │               │     ▼               ▼               ▼  ReAct      Plan-Execute    Multi-Agent     │               │               │     ▼               ▼               ▼需要反思改进？   需要验证？     需要专业分工？     │               │               │     ▼               ▼               ▼ Reflexion      +Evaluator    MetaGPT/CrewAI
+
+6.2 架构对比总表
+
+
+架构
+核心特点
+适用场景
+复杂度
+成本
+
+
+
+ReAct
+边思考边行动
+开放式问答、工具调用
+低
+中
+
+
+Plan-Execute
+先规划后执行
+多步骤任务、工作流
+中
+低-中
+
+
+Reflexion
+自我反思改进
+代码生成、复杂推理
+中
+高
+
+
+Multi-Agent
+角色分工协作
+软件开发、复杂项目
+高
+高
+
+
+6.3 组合使用实际项目中，架构往往组合使用：
+Multi-Agent System    │    ├── Planner Agent (Plan-Execute)    │       │    │       └── Executor Agent (ReAct + Reflexion)    │    └── Reviewer Agent (Reflexion)
+
+
+七、最佳实践7.1 架构设计原则
+简单优先：从简单架构开始，按需增加复杂度
+明确边界：每个Agent职责清晰，避免重叠
+可观测性：记录中间过程，便于调试
+容错设计：处理失败情况，支持重试和回退
+
+7.2 常见陷阱
+
+
+陷阱
+表现
+解决方案
+
+
+
+过度规划
+计划太细，无法执行
+保持计划粒度适中
+
+
+无限循环
+Agent反复执行同一动作
+设置最大迭代次数
+
+
+角色冲突
+多Agent职责不清
+明确定义角色边界
+
+
+上下文爆炸
+记忆过长导致遗忘
+实现记忆压缩机制
+
+
+
+参考资料
+ReAct: Synergizing Reasoning and Acting in Language Models
+Reflexion: Language Agents with Verbal Reinforcement Learning
+CAMEL: Communicative Agents for “Mind” Exploration
+MetaGPT: Meta Programming for A Multi-Agent Collaborative Framework
+
+]]></content>
+      <categories>
+        <category>Agent学习笔记</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>LLM推理机制与Prompt Caching深度解析</title>
+    <url>/2026/04/11/LLM%E6%8E%A8%E7%90%86%E6%9C%BA%E5%88%B6%E4%B8%8EPrompt%20Caching%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/</url>
+    <content><![CDATA[LLM推理机制与Prompt Caching深度解析
+摘要：本文深入探讨LLM推理过程中的KV Cache技术原理，解析Prompt Caching API的设计思想与使用场景，并对比流式输出与传统输出方式的差异。理解这些底层机制，有助于Agent开发者更好地优化应用性能与成本。
+
+一、KV Cache：Transformer推理的核心优化什么是KV Cache在Transformer架构中，Attention机制需要计算Query、Key、Value三个矩阵。KV Cache的核心思想是：缓存已计算过的Key和Value矩阵，避免重复计算。
+推理过程的两个阶段LLM推理分为两个阶段，每个阶段都依赖KV Cache：
+
+
+
+阶段
+处理内容
+KV Cache行为
+
+
+
+预填充
+处理输入prompt
+一次性计算所有token的K&#x2F;V并缓存
+
+
+生成
+输出每个新token
+边输出边计算边缓存
+
+
+预填充阶段：模型将整个输入prompt的所有token一次性处理，每个token计算其K&#x2F;V矩阵并存入缓存。这一步是并行的，速度很快。
+生成阶段：模型逐个生成新token。每生成一个token，都需要查询前面所有token的K&#x2F;V（复用缓存），计算当前token的K&#x2F;V，存入缓存，然后输出。
+为什么生成阶段必须用KV Cache假设生成第100个输出token时：
+
+没有缓存：需要重新计算前99个token的K&#x2F;V矩阵 → 计算量爆炸
+有缓存：直接查表获取前99个token的K&#x2F;V → 高效
+
+这就是为什么KV Cache是Transformer推理的基本优化，每次推理都在使用。
+二、Prompt Caching：跨请求的缓存复用两层KV Cache的区别
+
+
+层次
+作用范围
+存在条件
+
+
+
+请求内KV Cache
+单次请求内
+始终存在，推理引擎自动使用
+
+
+跨请求KV Cache
+跨多个请求
+需要Prompt Caching功能支持
+
+
+没有Prompt Caching时，每次请求结束后KV Cache就被丢弃，下次请求需要重新计算。
+Prompt Caching的本质Prompt Caching &#x3D; 将KV Cache的能力通过API暴露给开发者
+请求1：处理2000个token，生成KV Cache        ↓没有Prompt Caching：丢弃有Prompt Caching：保存5分钟        ↓请求2（5分钟内，内容匹配）：直接复用请求1的KV Cache
+
+cache_control的使用方式开发者通过cache_control参数标记哪些内容块需要缓存：
+response = client.messages.create(    model=&quot;claude-sonnet-4-6&quot;,    system=[        &#123;            &quot;type&quot;: &quot;text&quot;,            &quot;text&quot;: &quot;稳定的系统提示词...&quot;,            &quot;cache_control&quot;: &#123;&quot;type&quot;: &quot;ephemeral&quot;&#125;  # 标记缓存        &#125;    ],    messages=[...])
+
+什么时候应该使用缓存缓存的价值取决于三个条件：
+
+
+
+条件
+说明
+
+
+
+内容稳定
+多次请求中内容不变
+
+
+内容较大
+token数量足够多（通常&gt;1000）
+
+
+会复用
+短时间内会被多次使用
+
+
+System Prompt最适合缓存：内容稳定、通常较大、每次请求都会发送。
+Messages通常不适合缓存：每轮对话都在变化，缓存命中率低。
+缓存能节省什么
+
+
+层面
+能否节省
+说明
+
+
+
+网络传输
+❌ 不能
+每次请求必须发送完整内容
+
+
+服务器计算
+✅ 能
+命中缓存时复用KV矩阵，减少90%成本
+
+
+响应延迟
+✅ 能
+跳过预填充阶段，响应更快
+
+
+三、流式输出：优化用户感知延迟传统方式 vs 流式输出传统非流式：服务器生成完整响应后一次性返回。用户等待整个生成过程结束才能看到内容。
+流式输出：每生成一个token就立即返回给客户端。用户几乎立刻开始看到内容。
+感知延迟对比非流式：用户点击发送 ────────────────→ 看到回复                   │←── 等待10秒 ──→│流式：用户点击发送 ─→ 看到第一个字                   │←─→│                  0.1秒
+
+代码实现差异# 非流式：一次性获取完整结果response = client.messages.create(...)print(response.content[0].text)# 流式：逐块处理with client.messages.stream(...) as stream:    for text in stream.text_stream:        print(text, end=&quot;&quot;, flush=True)
+
+流式输出让用户感觉模型在”实时思考”，体验更加自然流畅。
+四、Agent开发者需要掌握的层次作为Agent开发者，不需要深入理解推理引擎的实现细节，但需要了解API层面的优化技巧：
+必须掌握
+Agent架构设计（循环、状态、消息流）
+工具系统（注册、分发、权限）
+Prompt组装与缓存策略
+API使用技巧（Streaming, Tool Use, Caching）
+
+了解概念即可
+KV Cache是什么，解决什么问题
+Prompt Caching怎么用，什么时候用
+为什么Streaming能降低感知延迟
+
+不需要学习
+Continuous Batching实现细节
+PagedAttention内存管理
+Flash Attention CUDA优化
+模型训练（预训练、SFT、RLHF）
+
+总结
+KV Cache是Transformer推理的基本优化，每次推理都在使用，分为预填充和生成两个阶段
+Prompt Caching是API功能，让开发者能利用跨请求的KV Cache复用，节省服务器计算成本
+流式输出优化用户感知延迟，让用户更快看到响应内容
+网络传输无法通过缓存节省，每次请求必须发送完整内容
+Agent开发者应聚焦API使用技巧，推理引擎优化是厂商的责任
+
+理解这些机制，能帮助Agent开发者做出更好的架构决策和性能优化。
+]]></content>
+      <categories>
+        <category>Agent学习笔记</category>
+      </categories>
+  </entry>
+  <entry>
     <title>05_应用实践</title>
     <url>/2026/04/11/05_%E5%BA%94%E7%94%A8%E5%AE%9E%E8%B7%B5/</url>
     <content><![CDATA[Agent 应用实践本文档系统介绍 Agent 在各领域的实际应用，涵盖代码助手、数据分析、自动化工作流、研究助手、客服对话、游戏等场景，并提供从零构建简单 Agent 的实战案例。
@@ -1006,178 +1569,773 @@ Cursor AI Documentation
       </categories>
   </entry>
   <entry>
-    <title>agent-paradigms-react-plan-reflection</title>
-    <url>/2026/04/11/agent-paradigms-react-plan-reflection/</url>
-    <content><![CDATA[智能体三大经典范式详解
-摘要：ReAct、Plan-and-Solve、Reflection 是构建智能体的三种经典范式。本文深入分析每种范式的工作原理、适用场景与设计权衡，帮助开发者根据实际需求选择合适的架构方案。
+    <title>什么是Agent</title>
+    <url>/2026/04/09/%E4%BB%80%E4%B9%88%E6%98%AFAgent/</url>
+    <content><![CDATA[Agent 学习笔记这个分类记录我在 AI Agent 领域的学习过程。
+内容包括：
 
-为何需要不同的范式大语言模型虽然强大，但在处理复杂任务时面临挑战：如何在推理与行动之间取得平衡？如何避免在多步骤任务中迷失方向？如何提升初始解决方案的质量？三种经典范式分别从不同角度回应这些问题。
-ReAct：推理与行动的协同核心思想ReAct（Reasoning and Acting）由 Shunyu Yao 于 2022 年提出，其核心思想是将”推理”与”行动”显式结合，形成”思考-行动-观察”的循环。
-在 ReAct 诞生之前，主流方法分为两类：”纯思考”型（如思维链）能进行复杂推理但无法与外部世界交互；”纯行动”型直接输出动作但缺乏规划和纠错能力。ReAct 认识到思考与行动是相辅相成的——思考指导行动，行动结果反过来修正思考。
-工作流程每个时间步，智能体执行以下循环：
-Thought（思考）→ Action（行动）→ Observation（观察）
+RAG（检索增强生成）
+Claude Code 使用技巧
+Agent 架构与设计模式
+MCP、Tool Use 等前沿技术
+
+持续更新中，欢迎交流！
+]]></content>
+      <categories>
+        <category>Agent学习笔记</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>03_关键技术</title>
+    <url>/2026/04/11/03_%E5%85%B3%E9%94%AE%E6%8A%80%E6%9C%AF/</url>
+    <content><![CDATA[Agent 关键技术
+本章深入探讨Agent的核心技术组件，这些技术是构建智能Agent的基石。
 
 
-Thought：智能体的”内心独白”，分析当前情况、分解任务、规划下一步
-Action：决定采取的具体动作，如调用工具或输出最终答案
-Observation：执行 Action 后从外部返回的结果
+一、Tool Use（工具调用）工具调用是Agent区别于普通LLM的核心能力，它让Agent能够与外部世界交互，执行具体操作。
+1.1 Function Calling 机制Function Calling 是LLM与外部工具交互的标准机制。其核心流程如下：
+用户请求 → LLM分析意图 → 选择合适工具 → 生成结构化参数 → 执行工具 → 返回结果 → LLM整合回复
 
-这个循环不断重复，将新的观察追加到历史记录中，形成不断增长的上下文，直到智能体认为已找到最终答案。
+工作机制：
+
+工具注册：将可用工具的schema注册到系统中
+意图理解：LLM根据用户输入判断是否需要调用工具
+参数生成：LLM生成符合工具要求的结构化参数
+执行调用：系统执行工具并获取结果
+结果整合：LLM将工具结果整合到最终回复中
+
+核心代码示例：
+import jsonfrom anthropic import Anthropicclient = Anthropic()# 定义工具tools = [    &#123;        &quot;name&quot;: &quot;get_weather&quot;,        &quot;description&quot;: &quot;获取指定城市的天气信息&quot;,        &quot;input_schema&quot;: &#123;            &quot;type&quot;: &quot;object&quot;,            &quot;properties&quot;: &#123;                &quot;city&quot;: &#123;                    &quot;type&quot;: &quot;string&quot;,                    &quot;description&quot;: &quot;城市名称&quot;                &#125;,                &quot;unit&quot;: &#123;                    &quot;type&quot;: &quot;string&quot;,                    &quot;enum&quot;: [&quot;celsius&quot;, &quot;fahrenheit&quot;],                    &quot;description&quot;: &quot;温度单位&quot;                &#125;            &#125;,            &quot;required&quot;: [&quot;city&quot;]        &#125;    &#125;]# 发送请求response = client.messages.create(    model=&quot;claude-3-opus-20240229&quot;,    messages=[&#123;&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;北京今天天气怎么样?&quot;&#125;],    tools=tools)# 处理工具调用if response.stop_reason == &quot;tool_use&quot;:    for block in response.content:        if block.type == &quot;tool_use&quot;:            tool_name = block.name            tool_input = block.input            result = execute_tool(tool_name, tool_input)
+
+1.2 工具定义与描述工具定义的质量直接影响LLM选择和调用的准确性。一个优秀的工具定义需要：
+
+清晰的语义：名称和描述准确传达工具功能
+完整的Schema：参数定义完整、类型明确、约束清晰
+充分的示例：通过示例说明典型用法
+
+工具定义标准结构：
+class ToolDefinition:    &quot;&quot;&quot;工具定义的标准结构&quot;&quot;&quot;    name: str              # 工具名称，建议使用snake_case    description: str       # 功能描述，说明工具的作用和使用场景    input_schema: dict     # JSON Schema格式的参数定义    output_schema: dict    # 可选：返回值结构定义    def execute(self, **kwargs):        &quot;&quot;&quot;工具的实际执行逻辑&quot;&quot;&quot;        raise NotImplementedError
+
+优秀描述示例：
+# 好的描述&#123;    &quot;name&quot;: &quot;search_web&quot;,    &quot;description&quot;: &quot;在互联网上搜索信息。当用户询问实时新闻、最新数据、或需要查询互联网上的具体信息时使用。&quot;,    &quot;input_schema&quot;: &#123;        &quot;type&quot;: &quot;object&quot;,        &quot;properties&quot;: &#123;            &quot;query&quot;: &#123;                &quot;type&quot;: &quot;string&quot;,                &quot;description&quot;: &quot;搜索关键词，建议使用简洁明确的查询语句&quot;            &#125;,            &quot;num_results&quot;: &#123;                &quot;type&quot;: &quot;integer&quot;,                &quot;description&quot;: &quot;返回结果数量，默认为5&quot;,                &quot;default&quot;: 5,                &quot;minimum&quot;: 1,                &quot;maximum&quot;: 20            &#125;        &#125;,        &quot;required&quot;: [&quot;query&quot;]    &#125;&#125;# 差的描述&#123;    &quot;name&quot;: &quot;search&quot;,  # 名称不明确    &quot;description&quot;: &quot;搜索&quot;,  # 描述过于简单    &quot;input_schema&quot;: &#123;        &quot;type&quot;: &quot;object&quot;,        &quot;properties&quot;: &#123;            &quot;q&quot;: &#123;&quot;type&quot;: &quot;string&quot;&#125;  # 参数名不清晰，缺少描述        &#125;    &#125;&#125;
+
+1.3 工具选择策略当可用工具众多时，如何让LLM高效选择合适的工具成为关键挑战。
+主要策略：
+
+
+
+策略
+描述
 适用场景
 
 
-场景类型
-具体例子
-为何适合 ReAct
+
+全量注入
+将所有工具schema加入prompt
+工具数量少（&lt;20）
 
 
-
-需要外部知识
-查询实时天气、新闻、股价
-可动态调用搜索工具
-
-
-需要精确计算
-复杂数学问题
-将计算交给专用工具
+语义检索
+根据查询语义检索相关工具
+工具数量多（&gt;20）
 
 
-需要 API 交互
-操作数据库、调用服务
-灵活的外部接口调用
+分层路由
+先选择工具类别，再选择具体工具
+工具有明确分类
 
 
-优势与局限优势：
+多阶段选择
+先粗选，再精细筛选
+需要高精度选择
 
-高可解释性：Thought 链清晰展示推理过程
-动态纠错能力：根据 Observation 实时调整策略
-工具协同能力：LLM 负责推理，工具负责执行
 
-局限：
+语义检索示例：
+from sentence_transformers import SentenceTransformerimport numpy as npclass ToolSelector:    def __init__(self, tools: list[ToolDefinition]):        self.tools = tools        self.encoder = SentenceTransformer(&#x27;all-MiniLM-L6-v2&#x27;)        # 预计算工具描述的嵌入向量        self.tool_embeddings = self.encoder.encode(            [t.description for t in tools]        )    def select_tools(self, query: str, top_k: int = 5):        &quot;&quot;&quot;根据查询选择最相关的工具&quot;&quot;&quot;        query_embedding = self.encoder.encode(query)        similarities = np.dot(self.tool_embeddings, query_embedding)        top_indices = np.argsort(similarities)[-top_k:]        return [self.tools[i] for i in top_indices]
 
-对 LLM 能力强依赖：模型推理和格式遵循能力直接影响成功率
-执行效率问题：多步串行调用带来延迟和成本
-可能陷入局部最优：缺乏全局规划，可能在错误路径上持续投入
 
-Plan-and-Solve：先规划后执行核心思想Plan-and-Solve 将任务处理明确分为两个阶段：先规划（Plan），后执行（Solve）。如果说 ReAct 像侦探根据线索一步步推理，Plan-and-Solve 则像建筑师在动工前先绘制完整蓝图。
-工作流程规划阶段：智能体接收完整问题，首先将问题分解为清晰的步骤计划。这个计划本身就是一次 LLM 调用的产物，要求输出结构化格式（如 Python 列表）。
-执行阶段：智能体严格按照计划逐一执行。每一步执行都可能是一次独立的 LLM 调用，或对上一步结果的加工处理。
-形式化表达规划模型 π_plan 根据原始问题 q 生成计划 P：
-P = π_plan(q) = (p_1, p_2, ..., p_n)
+二、Memory（记忆系统）记忆系统让Agent能够保持上下文连贯性，积累经验，实现长期学习。
+2.1 短期记忆 vs 长期记忆Agent的记忆系统类比人类记忆，分为不同层次：
+┌─────────────────────────────────────────────────────┐│                   记忆系统架构                        │├─────────────────────────────────────────────────────┤│  工作记忆（Working Memory）                          ││  - 当前对话上下文                                     ││  - 临时推理状态                                       ││  - 容量有限，实时更新                                  │├─────────────────────────────────────────────────────┤│  短期记忆（Short-term Memory）                       ││  - 最近N轮对话                                       ││  - 会话级别信息                                       ││  - 滑动窗口管理                                       │├─────────────────────────────────────────────────────┤│  长期记忆（Long-term Memory）                        ││  - 用户偏好和历史交互                                  ││  - 知识库和经验库                                     ││  - 持久化存储                                         │└─────────────────────────────────────────────────────┘
 
-执行模型 π_solve 逐一完成步骤，第 i 步的解决方案依赖原始问题、完整计划和之前所有执行结果：
-s_i = π_solve(q, P, (s_1, ..., s_&#123;i-1&#125;))
+对比分析：
 
-适用场景
-多步数学应用题：需要先列出计算步骤再逐一求解
-报告撰写：先规划结构（引言、数据来源、总结）再填充内容
-代码生成：先构思函数和模块结构再逐一实现
-
-与 ReAct 的对比
 
 
 维度
-ReAct
-Plan-and-Solve
+短期记忆
+长期记忆
 
 
 
-决策模式
-反应式，走一步看一步
-预见式，先谋后动
+存储位置
+内存&#x2F;上下文窗口
+向量数据库&#x2F;持久化存储
 
 
-规划能力
-动态调整，但缺乏全局视野
-全局规划，目标一致性强
+容量
+受上下文窗口限制
+理论无限
 
 
-灵活性
-高，可根据观察实时转向
-低，计划一旦生成就相对固定
+访问速度
+快速（毫秒级）
+较慢（检索需要时间）
 
 
-适用任务
-探索性、需要外部输入的任务
-结构性强、逻辑路径确定的任务
+更新频率
+每轮对话更新
+定期或触发式更新
 
 
-局限性主要局限在于计划的”静态性”——如果执行中发现某步骤无法完成，缺乏动态重规划机制。这要求规划阶段的质量足够高，或者需要设计额外的异常处理逻辑。
-Reflection：自我反思与迭代优化核心思想Reflection 机制为智能体引入”事后自我校正循环”，使其能够审视自己的工作，发现不足，并进行迭代优化。灵感来源于人类的学习过程：完成初稿后校对，解出数学题后验算。
-工作流程三步循环：执行 → 反思 → 优化
-执行：使用 ReAct 或 Plan-and-Solve 等方法生成初步解决方案
-反思：调用独立的 LLM 实例扮演”评审员”，从多个维度评估：
+信息类型
+原始对话文本
+提取的知识和摘要
 
-事实性错误：是否与已知事实相悖
-逻辑漏洞：推理过程是否连贯
-效率问题：是否有更优路径
-遗漏信息：是否忽略关键约束
 
-优化：将初稿和反馈作为新上下文，再次调用 LLM 进行修正
-形式化表达第 i 次迭代产生的输出 O_i，反思模型生成反馈 F_i：
-F_i = π_reflect(Task, O_i)
+检索方式
+顺序访问
+语义检索
 
-优化模型生成新版本：
-O_&#123;i+1&#125; = π_refine(Task, O_i, F_i)
 
-循环直到反思不再发现问题，或达到预设迭代上限。
+记忆管理实现：
+from dataclasses import dataclassfrom datetime import datetimefrom typing import Optional@dataclassclass Memory:    &quot;&quot;&quot;记忆单元&quot;&quot;&quot;    content: str                    # 记忆内容    timestamp: datetime             # 创建时间    importance: float               # 重要性评分 (0-1)    memory_type: str                # &#x27;short_term&#x27; | &#x27;long_term&#x27;    metadata: dict                  # 额外元数据    embedding: Optional[list] = None  # 向量嵌入class MemoryManager:    def __init__(self, max_short_term: int = 50):        self.short_term_memory: list[Memory] = []        self.long_term_memory_store = None        self.max_short_term = max_short_term    def add_memory(self, content: str, importance: float = 0.5):        &quot;&quot;&quot;添加新记忆&quot;&quot;&quot;        memory = Memory(            content=content,            timestamp=datetime.now(),            importance=importance,            memory_type=&#x27;short_term&#x27;,            metadata=&#123;&#125;        )        self.short_term_memory.append(memory)        # 短期记忆溢出时，转移到长期记忆        if len(self.short_term_memory) &gt; self.max_short_term:            self._consolidate_memory()    def _consolidate_memory(self):        &quot;&quot;&quot;记忆巩固：将短期记忆转移到长期记忆&quot;&quot;&quot;        to_transfer = len(self.short_term_memory) - self.max_short_term // 2        for _ in range(to_transfer):            memory = self.short_term_memory.pop(0)            if memory.importance &gt; 0.3:                self._save_to_long_term(memory)    def recall(self, query: str, top_k: int = 5) -&gt; list[Memory]:        &quot;&quot;&quot;检索相关记忆&quot;&quot;&quot;        recent = self.short_term_memory[-top_k:]        if self.long_term_memory_store:            long_term = self.long_term_memory_store.search(query, top_k)            return recent + long_term        return recent
+
+2.2 记忆存储与检索高效的记忆存储与检索是记忆系统的核心。
+存储策略：
+
+重要性加权：根据内容重要性决定存储优先级
+遗忘机制：模拟人类遗忘，定期清理低价值记忆
+压缩存储：对相似记忆进行合并和摘要
+
+检索策略：
+
+语义相似度检索：基于向量相似度找相关记忆
+时间衰减：最近记忆权重更高
+重要性加权：重要记忆更容易被检索
+
+import numpy as npfrom datetime import datetimeclass MemoryRetriever:    def __init__(self, decay_factor: float = 0.95):        self.decay_factor = decay_factor    def retrieve_with_decay(        self,        query_embedding: np.ndarray,        memories: list[Memory],        top_k: int = 5    ) -&gt; list[tuple[Memory, float]]:        &quot;&quot;&quot;带时间衰减的记忆检索&quot;&quot;&quot;        scores = []        now = datetime.now()        for memory in memories:            # 语义相似度            semantic_score = np.dot(query_embedding, memory.embedding) if memory.embedding else 0            # 时间衰减            time_diff = (now - memory.timestamp).total_seconds() / 3600            time_decay = self.decay_factor ** time_diff            # 重要性权重            importance_weight = memory.importance            # 综合得分            final_score = semantic_score * time_decay * importance_weight            scores.append((memory, final_score))        scores.sort(key=lambda x: x[1], reverse=True)        return scores[:top_k]
+
+2.3 向量数据库的应用向量数据库是长期记忆存储的核心技术，支持高效的语义检索。
+核心概念：
+文本 → Embedding模型 → 向量表示 → 向量数据库 → 相似度检索
+
+主流向量数据库：
+
+
+
+数据库
+特点
 适用场景
-代码生成与优化：从简单实现迭代到高效算法
-学术论文写作：多维度反思提升质量
-关键决策支持：需要高可靠性的场景
-
-成本收益分析成本：
-
-模型调用开销增加：每轮迭代至少额外两次调用
-任务延迟显著提高：串行过程延长总耗时
-提示工程复杂度上升：需为不同阶段设计专门提示词
-
-收益：
-
-解决方案质量的跃迁：从”合格”到”优秀”
-鲁棒性与可靠性增强：内部纠错机制
-
-结论：适合对结果质量要求极高、对实时性要求相对宽松的场景。
-范式选择策略
 
 
-任务特征
-推荐范式
+
+Pinecone
+托管服务，易用
+生产环境快速部署
+
+
+Milvus
+开源，高性能
+大规模生产环境
+
+
+Chroma
+轻量，易集成
+开发测试、小规模应用
+
+
+Weaviate
+支持混合检索
+需要结构化+向量检索
+
+
+Qdrant
+Rust实现，高效
+高性能要求场景
+
+
+
+三、Planning（规划能力）规划能力让Agent能够分解复杂任务，制定执行策略，是智能行为的核心。
+3.1 任务分解任务分解是将复杂目标拆解为可执行子任务的过程。
+分解策略：
+┌────────────────────────────────────────────────────┐│                任务分解方法                         │├────────────────────────────────────────────────────┤│  目标驱动分解                                       ││  - 从最终目标出发，逆向推导子目标                     ││  - 每个子目标完成后更接近最终目标                     │├────────────────────────────────────────────────────┤│  功能驱动分解                                       ││  - 按功能模块划分任务                               ││  - 各子任务相对独立                                 │├────────────────────────────────────────────────────┤│  时序驱动分解                                       ││  - 按执行顺序分解                                   ││  - 存在明确的依赖关系                               │├────────────────────────────────────────────────────┤│  层次化分解（HTN）                                  ││  - 高层任务分解为中层方法                           ││  - 中层方法分解为原子操作                           │└────────────────────────────────────────────────────┘
+
+任务分解实现：
+from dataclasses import dataclassfrom typing import List, Optionalfrom enum import Enumclass TaskStatus(Enum):    PENDING = &quot;pending&quot;    IN_PROGRESS = &quot;in_progress&quot;    COMPLETED = &quot;completed&quot;    FAILED = &quot;failed&quot;@dataclassclass Task:    id: str    description: str    status: TaskStatus = TaskStatus.PENDING    subtasks: List[&#x27;Task&#x27;] = None    dependencies: List[str] = None    result: Optional[str] = None    def __post_init__(self):        if self.subtasks is None:            self.subtasks = []        if self.dependencies is None:            self.dependencies = []class TaskPlanner:    def __init__(self, llm_client):        self.llm = llm_client    def decompose_task(self, goal: str) -&gt; Task:        &quot;&quot;&quot;使用LLM分解任务&quot;&quot;&quot;        prompt = f&quot;&quot;&quot;        请将以下目标分解为具体的子任务。        目标：&#123;goal&#125;        要求：        1. 每个子任务应该是可独立执行的最小单元        2. 明确子任务之间的依赖关系        3. 按执行顺序排列        以JSON格式输出：        &#123;&#123;            &quot;main_task&quot;: &quot;任务描述&quot;,            &quot;subtasks&quot;: [                &#123;&#123;                    &quot;id&quot;: &quot;1&quot;,                    &quot;description&quot;: &quot;子任务描述&quot;,                    &quot;dependencies&quot;: []                &#125;&#125;            ]        &#125;&#125;        &quot;&quot;&quot;        response = self.llm.generate(prompt)        return self._build_task_tree(parse_json(response))    def get_executable_tasks(self, task: Task) -&gt; List[Task]:        &quot;&quot;&quot;获取当前可执行的任务&quot;&quot;&quot;        executable = []        completed_ids = &#123;t.id for t in task.subtasks if t.status == TaskStatus.COMPLETED&#125;        for subtask in task.subtasks:            if subtask.status == TaskStatus.PENDING:                if all(dep in completed_ids for dep in subtask.dependencies):                    executable.append(subtask)        return executable
+
+3.2 思维链（Chain of Thought）思维链（CoT） 是一种让LLM显式展示推理过程的技术，提高复杂问题的解决质量。
+核心思想：
+问题 → [推理步骤1] → [推理步骤2] → ... → 答案
+
+而不是直接：问题 → 答案
+思维链类型：
+
+
+
+类型
+描述
+适用场景
+
+
+
+Zero-shot CoT
+仅提示”一步步思考”
+通用场景
+
+
+Few-shot CoT
+提供带推理的示例
+需要特定格式
+
+
+Self-Consistency
+多次采样取一致答案
+需要高可靠性
+
+
+Tree of Thoughts
+探索多条推理路径
+复杂决策问题
+
+
+实现示例：
+class ChainOfThought:    def __init__(self, llm_client):        self.llm = llm_client    def reason(self, question: str) -&gt; dict:        &quot;&quot;&quot;使用思维链进行推理&quot;&quot;&quot;        prompt = f&quot;&quot;&quot;        请一步步分析并回答以下问题。        问题：&#123;question&#125;        请按以下格式回答：        思考过程：        1. 首先，...        2. 然后，...        3. 接着，...        最终答案：...        &quot;&quot;&quot;        response = self.llm.generate(prompt)        return self._parse_response(response)    def reason_with_verification(self, question: str) -&gt; dict:        &quot;&quot;&quot;带自我验证的思维链&quot;&quot;&quot;        first_reasoning = self.reason(question)        verification_prompt = f&quot;&quot;&quot;        请验证以下推理过程是否正确：        问题：&#123;question&#125;        推理过程：&#123;first_reasoning[&#x27;reasoning_steps&#x27;]&#125;        答案：&#123;first_reasoning[&#x27;answer&#x27;]&#125;        请检查：        1. 推理步骤是否有逻辑错误        2. 是否遗漏重要信息        3. 答案是否合理        &quot;&quot;&quot;        verification = self.llm.generate(verification_prompt)        return &#123;**first_reasoning, &quot;verification&quot;: verification&#125;
+
+3.3 树搜索策略对于复杂决策问题，单一路径的推理可能不足，需要探索多个可能的路径。
+主要方法：
+┌─────────────────────────────────────────────────────┐│                 树搜索策略                           │├─────────────────────────────────────────────────────┤│  Tree of Thoughts (ToT)                             ││  - 生成多个候选思路                                  ││  - 评估每个思路的价值                                ││  - 选择最优路径继续探索                              │├─────────────────────────────────────────────────────┤│  MCTS (蒙特卡洛树搜索)                               ││  - 选择 → 扩展 → 模拟 → 回溯                        ││  - 平衡探索与利用                                    ││  - 适用于决策空间大的问题                            │├─────────────────────────────────────────────────────┤│  Beam Search                                        ││  - 每步保留top-k个候选                              ││  - 高效但可能错过最优解                             │├─────────────────────────────────────────────────────┤│  Best-First Search                                  ││  - 优先扩展最有希望的节点                            ││  - 使用启发式函数评估                               │└─────────────────────────────────────────────────────┘
+
+
+四、RAG与Agent结合检索增强生成（RAG） 为Agent提供知识支持，增强其解决问题的能力。
+4.1 知识增强RAG通过检索外部知识库，为Agent提供准确的、最新的信息支持。
+Agent + RAG 架构：
+┌─────────────────────────────────────────────────────┐│                Agent + RAG 架构                      │├─────────────────────────────────────────────────────┤│                                                     ││  用户查询 ──→ Agent ──→ 判断是否需要检索            ││                │                                    ││                ├─→ 需要检索 ──→ 生成检索查询        ││                │                    │               ││                │                    ↓               ││                │              向量数据库             ││                │                    │               ││                │                    ↓               ││                │              检索结果 ──→ 整合     ││                │                                    ││                └─→ 生成最终回答                      ││                                                     │└─────────────────────────────────────────────────────┘
+
+RAG Agent 实现：
+class RAGAgent:    def __init__(self, llm_client, vector_store, embedding_model):        self.llm = llm_client        self.vector_store = vector_store        self.embedder = embedding_model    def process_query(self, query: str) -&gt; str:        &quot;&quot;&quot;处理用户查询&quot;&quot;&quot;        # 判断是否需要检索        if not self._needs_retrieval(query):            return self._direct_answer(query)        # 生成检索查询        search_queries = self._generate_search_queries(query)        # 执行检索        contexts = []        for sq in search_queries:            contexts.extend(self._retrieve(sq))        # 去重和重排序        contexts = self._deduplicate(contexts)        contexts = self._rerank(query, contexts)        # 生成回答        return self._generate_answer(query, contexts[:5])    def _needs_retrieval(self, query: str) -&gt; bool:        &quot;&quot;&quot;判断查询是否需要检索外部知识&quot;&quot;&quot;        prompt = f&quot;&quot;&quot;        判断以下问题是否需要查询外部知识库来回答。        如果问题涉及具体事实、数据、或最新信息，回答&quot;是&quot;。        如果是通用知识或常识问题，回答&quot;否&quot;。        问题：&#123;query&#125;        只回答&quot;是&quot;或&quot;否&quot;。        &quot;&quot;&quot;        return &quot;是&quot; in self.llm.generate(prompt)
+
+4.2 动态检索动态检索根据Agent执行过程中的实际需要，实时检索相关信息。
+应用场景：
+
+工具使用前检索：查询工具使用文档
+代码生成时检索：检索相关API和代码示例
+决策时检索：检索历史案例和最佳实践
+
+
+五、自我修正与错误恢复智能Agent需要具备自我诊断和修正错误的能力，这是实现可靠性的关键。
+5.1 自我修正机制自我修正让Agent能够检测并纠正自己的错误，形成”执行-验证-修正“的闭环。
+┌─────────────────────────────────────────────────────┐│               自我修正流程                           │├─────────────────────────────────────────────────────┤│                                                     ││  执行任务 ──→ 结果验证 ──→ 发现错误？               ││                │              │                     ││                │              ├─→ 否 ──→ 返回结果   ││                │              │                     ││                │              └─→ 是                ││                │                    │               ││                │                    ↓               ││                │              错误分析              ││                │                    │               ││                │                    ↓               ││                │              生成修正方案          ││                │                    │               ││                └────────────────────┘               ││                                                     │└─────────────────────────────────────────────────────┘
+
+实现示例：
+from dataclasses import dataclassfrom enum import Enumclass ErrorType(Enum):    EXECUTION_ERROR = &quot;execution_error&quot;    OUTPUT_ERROR = &quot;output_error&quot;    LOGIC_ERROR = &quot;logic_error&quot;    RESOURCE_ERROR = &quot;resource_error&quot;@dataclassclass ErrorInfo:    error_type: ErrorType    description: str    context: dict    suggestion: str = Noneclass SelfCorrectionAgent:    def __init__(self, llm_client, max_retries: int = 3):        self.llm = llm_client        self.max_retries = max_retries    def execute_with_correction(self, task: str, executor: callable) -&gt; Any:        &quot;&quot;&quot;带自我修正的任务执行&quot;&quot;&quot;        for attempt in range(self.max_retries):            try:                result = executor(task)                validation = self._validate_result(task, result)                if validation[&quot;valid&quot;]:                    return result                error = self._analyze_error(task, result, validation)                task = self._generate_correction(task, error, result)            except Exception as e:                error = ErrorInfo(                    error_type=ErrorType.EXECUTION_ERROR,                    description=str(e),                    context=&#123;&quot;attempt&quot;: attempt&#125;                )                task = self._generate_correction(task, error, None)        raise Exception(f&quot;经过&#123;self.max_retries&#125;次尝试后仍无法完成任务&quot;)
+
+5.2 错误恢复策略恢复策略：
+
+
+
+策略
+描述
+适用场景
+
+
+
+重试
+简单重新执行
+临时性错误
+
+
+回退
+回到上一个稳定状态
+部分执行失败
+
+
+替代路径
+使用备选方案
+主路径失败
+
+
+降级
+简化任务目标
+资源不足
+
+
+人工介入
+请求人类帮助
+无法自动恢复
+
+
+5.3 错误预防与监控主动的错误预防和实时监控可以减少错误发生。
+class AgentMonitor:    def __init__(self):        self.metrics = &#123;&#125;        self.alert_handlers = []    def register_metric(self, name: str, threshold: float):        &quot;&quot;&quot;注册监控指标&quot;&quot;&quot;        self.metrics[name] = &#123;            &quot;threshold&quot;: threshold,            &quot;values&quot;: [],            &quot;status&quot;: &quot;healthy&quot;        &#125;    def record_metric(self, name: str, value: float):        &quot;&quot;&quot;记录指标值&quot;&quot;&quot;        if name in self.metrics:            self.metrics[name][&quot;values&quot;].append(&#123;                &quot;value&quot;: value,                &quot;timestamp&quot;: datetime.now()            &#125;)            threshold = self.metrics[name][&quot;threshold&quot;]            if value &gt; threshold:                self.metrics[name][&quot;status&quot;] = &quot;critical&quot;                self._trigger_alert(name, value, threshold)            elif value &gt; threshold * 0.8:                self.metrics[name][&quot;status&quot;] = &quot;warning&quot;    def check_health(self) -&gt; dict:        &quot;&quot;&quot;健康检查&quot;&quot;&quot;        return &#123;            name: &#123;                &quot;status&quot;: data[&quot;status&quot;],                &quot;latest_value&quot;: data[&quot;values&quot;][-1][&quot;value&quot;] if data[&quot;values&quot;] else None            &#125;            for name, data in self.metrics.items()        &#125;
+
+
+总结Agent的关键技术构成了智能系统的核心能力：
+
+
+
+技术
+核心价值
+关键挑战
+
+
+
+Tool Use
+扩展能力边界
+工具选择、参数生成
+
+
+Memory
+保持连贯性
+存储效率、检索精度
+
+
+Planning
+处理复杂任务
+任务分解、执行调度
+
+
+RAG
+知识增强
+检索时机、信息整合
+
+
+自我修正
+提高可靠性
+错误检测、恢复策略
+
+
+这些技术相互协作，共同支撑Agent的智能行为。在实际应用中，需要根据具体场景选择合适的技术组合和实现方式。
+]]></content>
+      <categories>
+        <category>Agent学习笔记</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Prompt-Caching与KV-Cache深度解析</title>
+    <url>/2026/04/11/Prompt-Caching%E4%B8%8EKV-Cache%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/</url>
+    <content><![CDATA[LLM Prompt Caching 与 KV Cache 深度解析
+摘要：本文从 Transformer 的 KV Cache 原理出发，深入分析 Anthropic Prompt Caching 的设计机制，包括缓存键计算、缓存断点策略、global&#x2F;org scope 的区别，以及 Claude Code 的实际实现代码。帮助读者理解 LLM 推理优化的核心技术。
+
+一、KV Cache：Transformer 推理的核心优化1.1 什么是 KV CacheTransformer 模型在推理时，每一层都会计算 Query (Q)、Key (K)、Value (V) 三个向量。其中 K 和 V 可以被缓存起来，避免重复计算。
+注意力计算公式：
+Output = softmax(Q × K^T) × V
+
+当模型生成 token 时，每个新 token 都需要与之前所有 token 计算注意力。如果没有 KV Cache，每次生成都要重新计算所有历史 token 的 K 和 V，这会造成巨大的计算浪费。
+1.2 KV Cache 的工作原理
+
+
+步骤
+操作
+说明
+
+
+
+1
+输入 token 序列
+[token_1, token_2, token_3]
+
+
+2
+计算 K、V
+每个 token 生成对应的 K_i, V_i
+
+
+3
+缓存 K、V
+存储到内存中
+
+
+4
+生成新 token
+只需计算新 token 的 K、V，复用缓存的
+
+
+核心特性：KV Cache 必须是连续的前缀
+由于位置编码（如 RoPE）被”烘焙”进 K 和 V 向量中，缓存的位置信息是固定的。这意味着：
+
+✓ 可以缓存 [token_1, token_2, token_3]
+✗ 不能只缓存 [token_3]（位置不匹配）
+✗ 不能缓存非连续片段
+
+1.3 为什么这很重要KV Cache 是现代 LLM 推理的基石：
+
+减少计算量：历史内容无需重复计算
+降低延迟：生成速度更快
+节省成本：API 费用更低（缓存命中的 token 更便宜）
+
+
+二、Prompt Caching：API 层面的缓存机制2.1 从 KV Cache 到 Prompt CachingPrompt Caching 是 Anthropic 在 API 层面提供的缓存服务，本质上是让用户”预约” KV Cache 的存储和复用。
+API 请求示例：
+&#123;  &quot;system&quot;: [    &#123; &quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;You are Claude...&quot;, &quot;cache_control&quot;: &#123; &quot;type&quot;: &quot;ephemeral&quot; &#125; &#125;  ],  &quot;messages&quot;: [    &#123; &quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Hello&quot;, &quot;cache_control&quot;: &#123; &quot;type&quot;: &quot;ephemeral&quot; &#125; &#125;  ]&#125;
+
+cache_control 标记告诉服务端：”这部分内容请帮我缓存，下次可能复用”。
+2.2 缓存键的计算服务端通过哈希值判断缓存是否命中：
+缓存键 = hash(  model,      // 模型名称  system,     // 系统提示词内容  tools,      // 工具定义  messages,   // 消息内容  ...)
+
+关键点：任何差异都会导致缓存未命中
+
+
+
+变化
+结果
+
+
+
+文本内容不同
+缓存键不同，未命中
+
+
+工具定义不同
+缓存键不同，未命中
+
+
+工具顺序不同
+缓存键不同，未命中
+
+
+模型不同
+缓存键不同，未命中
+
+
+2.3 多个 cache_control 的处理一个请求可以有多个 cache_control，每个对应一个”检查点”：
+请求: [block_1] [block_2] [block_3]        cc#1      cc#2      cc#3服务端存储:├── Entry 1: key = hash(block_1)├── Entry 2: key = hash(block_1 + block_2)└── Entry 3: key = hash(block_1 + block_2 + block_3)
+
+匹配策略：从后往前，贪婪最长匹配
+
+先检查 key_3（最长）
+如果命中 → 全部复用，结束
+如果未命中 → 检查 key_2
+以此类推，找到最长命中
+
+2.4 API 响应解读&#123;  &quot;usage&quot;: &#123;    &quot;input_tokens&quot;: 100,    &quot;cache_creation_input_tokens&quot;: 500,    &quot;cache_read_input_tokens&quot;: 2000  &#125;&#125;
+
+
+
+
+字段
+含义
+
+
+
+cache_read_input_tokens
+从缓存命中的 token 数（便宜）
+
+
+cache_creation_input_tokens
+新创建缓存的 token 数（较贵）
+
+
+input_tokens
+未缓存的普通输入 token
+
+
+两个值可以同时非零，说明缓存是分段独立管理的。
+
+三、Global vs Org Scope：缓存池的层级3.1 缓存池的概念缓存池是服务端内存中存储 KV Cache 的区域，不同 scope 对应不同的缓存池：
+
+
+
+Scope
+缓存池范围
+适用场景
+
+
+
+global
+全球所有用户共享
+静态内容，所有用户相同
+
+
+org
+同一账号内共享
+用户特定内容
+
+
+null
+不缓存
+动态内容
+
+
+3.2 为什么 MCP 工具禁用 Global ScopeMCP（Model Context Protocol）工具是用户自定义的外部工具，每个用户的配置不同：
+用户 A: tools = [Read, Edit, mcp__github__repo]用户 B: tools = [Read, Edit, mcp__jira__issue]
+
+如果使用 global scope：
+
+用户 A 的缓存 key 包含 mcp__github__repo
+用户 B 的缓存 key 包含 mcp__jira__issue
+缓存键不同，无法共享
+
+解决方案：有 MCP 工具时，降级为 org scope
+这样每个用户有自己的缓存池，不会互相污染。
+3.3 对单个用户的实际影响对于单个用户来说，global 和 org scope 的效果相同：
+
+第一次请求：创建缓存
+后续请求：命中缓存
+
+区别只在于”跨用户共享”这个服务端优化层面。
+
+四、Claude Code 的缓存实现4.1 缓存断点策略Claude Code 在请求中放置三个 cache_control：
+请求结构:├── system: [cache_control]     ← 系统提示词末尾├── tools: [cache_control]      ← 工具定义末尾└── messages: [cache_control]   ← 最后一条消息末尾
+
+关键代码逻辑：
+// 只在最后一条消息加 cache_controlconst markerIndex = messages.length - 1messages.map((msg, index) =&gt; &#123;  const addCache = index === markerIndex  // 只有这一条加  // ...&#125;)
+
+4.2 为什么 assistant 消息不加 cache_control
+
+
+原因
+说明
+
+
+
+API 限制
+cache_control 对 assistant 消息支持有限
+
+
+实用性
+缓存到上一条 user 消息就足够
+
+
+效率
+避免缓存粒度过细，管理开销大
+
+
+实际效果：
+第 1 轮: [system] [tools] [user_1] → 缓存第 2 轮: [system] [tools] [user_1] [assistant_1] [user_2]                 ↑─────────────────↑ 复用缓存                                    ↑────────↑ 新计算
+
+4.3 工具排序保证缓存稳定Claude Code 对工具列表进行排序，确保每次请求的顺序一致：
+const byName = (a, b) =&gt; a.name.localeCompare(b.name)return [...builtInTools].sort(byName).concat(allowedMcpTools.sort(byName))
+
+这保证了相同工具集的缓存键一致，提高命中率。
+
+五、服务端实现：协议与自由5.1 API 协议是双向契约
+
+
+方向
+必须遵守的内容
+
+
+
+客户端 → 服务端
+cache_control 位置、scope 值、请求格式
+
+
+服务端 → 客户端
+cache_read_input_tokens、cache_creation_input_tokens、响应格式
+
+
+5.2 服务端的实现自由API 协议规定”做什么”，服务端自由决定”怎么做”：
+
+
+
+协议规定
+服务端自由实现
+
+
+
+cache_control 放在末尾
+具体存储结构（N 个条目？增量存储？）
+
+
+返回缓存命中统计
+匹配算法（从前往后？从后往前？）
+
+
+scope 决定缓存池
+淘汰策略（LRU? LFU? TTL?）
+
+
+不同服务提供商可以有完全不同的内部实现，只要符合协议即可。
+5.3 缓存的生命周期创建 → 命中(TTL续期) → ... → 命中(TTL续期) → 过期(5分钟无访问) │                                              │ └── cache_creation_input_tokens ──┐           │                                    │           │                         cache_read_input_tokens┘
+
+
+六、模型输出的 KV Cache6.1 输出时也在计算 KV模型生成每个 token 时，都会计算并保存对应的 K 和 V：
+生成 token_1: 计算 Q_1, K_1, V_1 → 保存 K_1, V_1生成 token_2: 计算 Q_2, K_2, V_2 → 保存 K_2, V_2...
+
+这些 KV Cache 在服务端内存中，但客户端没有”凭证”引用它们。
+6.2 下次请求如何复用通过上一条 user 消息的缓存间接复用：
+缓存了: [system] [tools] [user_1]下次请求: [system] [tools] [user_1] [assistant_1] [user_2]                    ↑─────────────↑ 命中缓存
+
+assistant_1 的 KV Cache 虽然在服务端内存中，但没有 cache_control 标记，客户端无法直接引用。服务端可能内部有更激进的优化，但客户端只关心协议层面的缓存。
+
+总结
+KV Cache 是 Transformer 推理优化的核心，必须是连续前缀，不能缓存中间片段
+Prompt Caching 是 API 层面的缓存服务，通过 cache_control 标记预约缓存
+缓存键由内容哈希计算，任何差异都会导致未命中
+多个 cache_control 对应多个检查点，服务端从后往前贪婪匹配
+global vs org scope 决定缓存池范围，对单用户体验相同
+Claude Code 只在最后一条消息加 cache_control，assistant 消息不加
+API 协议是双向契约，服务端内部实现有自由度
+
+理解这些机制，有助于优化 API 使用成本，设计更高效的 LLM 应用。
+]]></content>
+      <categories>
+        <category>Agent学习笔记</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>helloagents-memory-system-design</title>
+    <url>/2026/04/11/helloagents-memory-system-design/</url>
+    <content><![CDATA[HelloAgents 框架记忆系统设计解析
+摘要：记忆是智能体的核心能力之一。HelloAgents 框架借鉴认知科学的记忆模型，设计了四层记忆架构，并整合 RAG 系统实现知识检索。本文深入解析这一设计的技术实现与工程考量。
+
+为何智能体需要记忆大语言模型存在两个根本性局限：无状态导致的对话遗忘和内置知识的局限性。
+对话遗忘问题LLM 设计上是无状态的，每一次请求都是独立的计算。这意味着：
+
+上下文丢失：长对话中早期信息可能因窗口限制而丢失
+个性化缺失：无法记住用户偏好和习惯
+学习能力受限：无法从过往经验中学习
+一致性问题：多轮对话可能出现前后矛盾
+
+知识局限问题LLM 的知识完全来自训练数据，存在：
+
+知识时效性：训练数据有时间截止点
+专业领域深度：通用模型在特定领域知识不足
+事实准确性：可能产生幻觉
+可解释性：缺乏信息来源追溯
+
+从认知科学获得启发人类记忆系统是多层级的认知结构，这为设计智能体记忆提供了理论框架。
+人类记忆的层次结构
+
+
+记忆类型
+持续时间
+容量
+功能
+
+
+
+感觉记忆
+0.5-3 秒
+巨大
+暂存感官信息
+
+
+工作记忆
+15-30 秒
+7±2 项目
+当前任务处理
+
+
+长期记忆
+可达终生
+几乎无限
+知识与经验存储
+
+
+长期记忆进一步分为程序性记忆（技能习惯）和陈述性记忆（可用语言表达的知识），后者又包含语义记忆（一般知识概念）和情景记忆（个人经历事件）。
+HelloAgents 四层记忆架构借鉴认知科学，框架设计了四层架构：
+基础设施层提供记忆系统的底层支撑：
+
+MemoryManager：统一调度和协调的中心控制器
+MemoryItem：标准化的记忆数据结构
+MemoryConfig：系统参数配置管理
+BaseMemory：通用接口定义
+
+记忆类型层实现不同特性的记忆类型：
+
+
+
+类型
+特性
+存储特点
+典型用途
+
+
+
+WorkingMemory
+临时信息
+纯内存，TTL 管理
+当前对话上下文
+
+
+EpisodicMemory
+具体事件
+SQLite + Qdrant
+历史交互记录
+
+
+SemanticMemory
+抽象知识
+Qdrant + Neo4j
+知识图谱关系
+
+
+PerceptualMemory
+多模态数据
+SQLite + Qdrant
+图像、音频等
+
+
+存储后端层提供多样化的持久化方案：
+
+QdrantVectorStore：高性能向量检索，支持语义相似度搜索
+Neo4jGraphStore：知识图谱管理，支持实体关系查询
+SQLiteDocumentStore：结构化持久化，轻量级本地存储
+
+嵌入服务层提供文本向量化能力：
+
+DashScopeEmbedding：阿里云通义千问嵌入，云端 API
+LocalTransformerEmbedding：本地 sentence-transformers，离线部署
+TFIDFEmbedding：轻量级 TF-IDF，作为兜底方案
+
+记忆系统工作流程记忆的形成经历五个认知阶段，每个阶段映射为具体的技术操作：
+编码（Encoding）将感知到的信息转换为可存储的形式。在技术实现中，这涉及文本预处理、实体抽取、向量化等操作。
+存储（Storage）将编码后的信息保存在记忆系统中。不同类型的记忆选择不同的存储后端：工作记忆存内存，情景记忆存 SQLite，语义记忆存图数据库。
+检索（Retrieval）根据需要从记忆中提取相关信息。支持多种检索策略：向量相似度、关键词匹配、时间范围、实体关联等。
+整合（Consolidation）将短期记忆转化为长期记忆。框架实现了记忆的”升级”机制：工作记忆中频繁访问的信息可自动提升为情景记忆或语义记忆。
+遗忘（Forgetting）删除不重要或过时的信息。实现了 TTL 过期机制、容量限制策略、重要性评分淘汰等机制。
+RAG 系统设计RAG（检索增强生成）专注于外部知识的获取和利用，与记忆系统形成互补。
+架构设计HelloAgents RAG系统├── 文档处理层│   ├── DocumentProcessor - 多格式解析│   ├── Document - 元数据管理│   └── Pipeline - 端到端处理├── 嵌入表示层│   └── 复用记忆系统的嵌入服务├── 向量存储层│   └── QdrantVectorStore - 命名空间隔离└── 智能问答层    ├── 多策略检索 - 向量检索 + MQE + HyDE    ├── 上下文构建 - 智能片段合并    └── LLM增强生成 - 基于上下文问答
+
+与记忆系统的关系记忆系统和 RAG 系统被设计为两个独立的工具：
+
+memory_tool：存储和维护对话过程中的交互信息
+rag_tool：从知识库中检索相关信息作为上下文
+
+两者可以协同工作：RAG 检索到的重要信息可自动存储到记忆系统，形成知识的积累。
+工程实现考量存储后端选择
+
+
+场景
+推荐方案
 理由
 
 
 
-需要外部信息检索
-ReAct
-动态调用工具，实时获取数据
+开发测试
+SQLite + 内存
+零配置，快速启动
 
 
-多步骤结构化推理
-Plan-and-Solve
-全局规划，避免迷失
+生产环境
+Qdrant + Neo4j
+高性能，可扩展
 
 
-对结果质量要求极高
-Reflection
-迭代优化，持续提升
+知识密集型
+Qdrant + Neo4j
+支持复杂关系查询
 
 
-快速响应优先
-ReAct 或 Plan-and-Solve
-避免 Reflection 的多轮迭代
+资源受限
+SQLite + TF-IDF
+轻量级，低资源占用
 
 
-复杂综合任务
-组合使用
-如 Plan-and-Solve + Reflection
-
+嵌入模型选择云端 API（如 DashScope）适合追求效果和便捷性的场景；本地模型适合对数据隐私有要求或需要离线部署的场景；TF-IDF 作为兜底方案，在无法使用深度模型时提供基础能力。
+性能优化策略
+批量处理：文档分块和向量化采用批量操作
+缓存机制：频繁访问的记忆项缓存到工作记忆
+异步索引：新记忆异步建立向量索引，不阻塞主流程
+命名空间隔离：不同用户&#x2F;会话使用独立命名空间
 
 总结
-ReAct 将推理与行动结合，适合需要动态交互的任务，优势在于灵活性和可解释性
-Plan-and-Solve 先规划后执行，适合结构化推理任务，优势在于目标一致性和稳定性
-Reflection 引入自我校正机制，适合高要求场景，以成本换取质量提升
-三种范式并非互斥，可根据任务特征组合使用
-选择范式时需权衡实时性要求、结果质量要求和任务复杂度
+智能体记忆系统借鉴认知科学的多层级设计，实现不同特性的记忆类型
+四层架构（基础设施、记忆类型、存储后端、嵌入服务）实现了关注点分离
+多种存储后端和嵌入服务提供了灵活的技术选型空间
+RAG 系统与记忆系统互补，解决外部知识获取问题
+工程实现需在效果、性能、资源占用之间权衡
 
 ]]></content>
       <categories>
@@ -1540,6 +2698,22 @@ Anthropic: “Building effective agents”
       </categories>
   </entry>
   <entry>
+    <title>关于作品集</title>
+    <url>/2026/04/09/%E5%85%B3%E4%BA%8E%E4%BD%9C%E5%93%81%E9%9B%86/</url>
+    <content><![CDATA[作品集这里展示我的个人项目与作品。
+包括：
+
+独立开发的小工具
+有趣的编程项目
+其他创意作品
+
+每个作品都记录了从想法到实现的过程。
+]]></content>
+      <categories>
+        <category>作品集</category>
+      </categories>
+  </entry>
+  <entry>
     <title>hello-agents-architecture-overview</title>
     <url>/2026/04/11/hello-agents-architecture-overview/</url>
     <content><![CDATA[Hello-Agents 项目架构深度解析
@@ -1676,1093 +2850,182 @@ Hello-Agents 聚焦 AI Native Agent，帮助学习者从”使用者”成长为
       </categories>
   </entry>
   <entry>
-    <title>helloagents-memory-system-design</title>
-    <url>/2026/04/11/helloagents-memory-system-design/</url>
-    <content><![CDATA[HelloAgents 框架记忆系统设计解析
-摘要：记忆是智能体的核心能力之一。HelloAgents 框架借鉴认知科学的记忆模型，设计了四层记忆架构，并整合 RAG 系统实现知识检索。本文深入解析这一设计的技术实现与工程考量。
+    <title>agent-paradigms-react-plan-reflection</title>
+    <url>/2026/04/11/agent-paradigms-react-plan-reflection/</url>
+    <content><![CDATA[智能体三大经典范式详解
+摘要：ReAct、Plan-and-Solve、Reflection 是构建智能体的三种经典范式。本文深入分析每种范式的工作原理、适用场景与设计权衡，帮助开发者根据实际需求选择合适的架构方案。
 
-为何智能体需要记忆大语言模型存在两个根本性局限：无状态导致的对话遗忘和内置知识的局限性。
-对话遗忘问题LLM 设计上是无状态的，每一次请求都是独立的计算。这意味着：
-
-上下文丢失：长对话中早期信息可能因窗口限制而丢失
-个性化缺失：无法记住用户偏好和习惯
-学习能力受限：无法从过往经验中学习
-一致性问题：多轮对话可能出现前后矛盾
-
-知识局限问题LLM 的知识完全来自训练数据，存在：
-
-知识时效性：训练数据有时间截止点
-专业领域深度：通用模型在特定领域知识不足
-事实准确性：可能产生幻觉
-可解释性：缺乏信息来源追溯
-
-从认知科学获得启发人类记忆系统是多层级的认知结构，这为设计智能体记忆提供了理论框架。
-人类记忆的层次结构
+为何需要不同的范式大语言模型虽然强大，但在处理复杂任务时面临挑战：如何在推理与行动之间取得平衡？如何避免在多步骤任务中迷失方向？如何提升初始解决方案的质量？三种经典范式分别从不同角度回应这些问题。
+ReAct：推理与行动的协同核心思想ReAct（Reasoning and Acting）由 Shunyu Yao 于 2022 年提出，其核心思想是将”推理”与”行动”显式结合，形成”思考-行动-观察”的循环。
+在 ReAct 诞生之前，主流方法分为两类：”纯思考”型（如思维链）能进行复杂推理但无法与外部世界交互；”纯行动”型直接输出动作但缺乏规划和纠错能力。ReAct 认识到思考与行动是相辅相成的——思考指导行动，行动结果反过来修正思考。
+工作流程每个时间步，智能体执行以下循环：
+Thought（思考）→ Action（行动）→ Observation（观察）
 
 
-记忆类型
-持续时间
-容量
-功能
+Thought：智能体的”内心独白”，分析当前情况、分解任务、规划下一步
+Action：决定采取的具体动作，如调用工具或输出最终答案
+Observation：执行 Action 后从外部返回的结果
+
+这个循环不断重复，将新的观察追加到历史记录中，形成不断增长的上下文，直到智能体认为已找到最终答案。
+适用场景
+
+
+场景类型
+具体例子
+为何适合 ReAct
 
 
 
-感觉记忆
-0.5-3 秒
-巨大
-暂存感官信息
+需要外部知识
+查询实时天气、新闻、股价
+可动态调用搜索工具
 
 
-工作记忆
-15-30 秒
-7±2 项目
-当前任务处理
+需要精确计算
+复杂数学问题
+将计算交给专用工具
 
 
-长期记忆
-可达终生
-几乎无限
-知识与经验存储
+需要 API 交互
+操作数据库、调用服务
+灵活的外部接口调用
 
 
-长期记忆进一步分为程序性记忆（技能习惯）和陈述性记忆（可用语言表达的知识），后者又包含语义记忆（一般知识概念）和情景记忆（个人经历事件）。
-HelloAgents 四层记忆架构借鉴认知科学，框架设计了四层架构：
-基础设施层提供记忆系统的底层支撑：
+优势与局限优势：
 
-MemoryManager：统一调度和协调的中心控制器
-MemoryItem：标准化的记忆数据结构
-MemoryConfig：系统参数配置管理
-BaseMemory：通用接口定义
+高可解释性：Thought 链清晰展示推理过程
+动态纠错能力：根据 Observation 实时调整策略
+工具协同能力：LLM 负责推理，工具负责执行
 
-记忆类型层实现不同特性的记忆类型：
+局限：
 
+对 LLM 能力强依赖：模型推理和格式遵循能力直接影响成功率
+执行效率问题：多步串行调用带来延迟和成本
+可能陷入局部最优：缺乏全局规划，可能在错误路径上持续投入
 
+Plan-and-Solve：先规划后执行核心思想Plan-and-Solve 将任务处理明确分为两个阶段：先规划（Plan），后执行（Solve）。如果说 ReAct 像侦探根据线索一步步推理，Plan-and-Solve 则像建筑师在动工前先绘制完整蓝图。
+工作流程规划阶段：智能体接收完整问题，首先将问题分解为清晰的步骤计划。这个计划本身就是一次 LLM 调用的产物，要求输出结构化格式（如 Python 列表）。
+执行阶段：智能体严格按照计划逐一执行。每一步执行都可能是一次独立的 LLM 调用，或对上一步结果的加工处理。
+形式化表达规划模型 π_plan 根据原始问题 q 生成计划 P：
+P = π_plan(q) = (p_1, p_2, ..., p_n)
 
-类型
-特性
-存储特点
-典型用途
+执行模型 π_solve 逐一完成步骤，第 i 步的解决方案依赖原始问题、完整计划和之前所有执行结果：
+s_i = π_solve(q, P, (s_1, ..., s_&#123;i-1&#125;))
 
+适用场景
+多步数学应用题：需要先列出计算步骤再逐一求解
+报告撰写：先规划结构（引言、数据来源、总结）再填充内容
+代码生成：先构思函数和模块结构再逐一实现
 
-
-WorkingMemory
-临时信息
-纯内存，TTL 管理
-当前对话上下文
-
-
-EpisodicMemory
-具体事件
-SQLite + Qdrant
-历史交互记录
+与 ReAct 的对比
 
 
-SemanticMemory
-抽象知识
-Qdrant + Neo4j
-知识图谱关系
+维度
+ReAct
+Plan-and-Solve
 
 
-PerceptualMemory
-多模态数据
-SQLite + Qdrant
-图像、音频等
+
+决策模式
+反应式，走一步看一步
+预见式，先谋后动
 
 
-存储后端层提供多样化的持久化方案：
-
-QdrantVectorStore：高性能向量检索，支持语义相似度搜索
-Neo4jGraphStore：知识图谱管理，支持实体关系查询
-SQLiteDocumentStore：结构化持久化，轻量级本地存储
-
-嵌入服务层提供文本向量化能力：
-
-DashScopeEmbedding：阿里云通义千问嵌入，云端 API
-LocalTransformerEmbedding：本地 sentence-transformers，离线部署
-TFIDFEmbedding：轻量级 TF-IDF，作为兜底方案
-
-记忆系统工作流程记忆的形成经历五个认知阶段，每个阶段映射为具体的技术操作：
-编码（Encoding）将感知到的信息转换为可存储的形式。在技术实现中，这涉及文本预处理、实体抽取、向量化等操作。
-存储（Storage）将编码后的信息保存在记忆系统中。不同类型的记忆选择不同的存储后端：工作记忆存内存，情景记忆存 SQLite，语义记忆存图数据库。
-检索（Retrieval）根据需要从记忆中提取相关信息。支持多种检索策略：向量相似度、关键词匹配、时间范围、实体关联等。
-整合（Consolidation）将短期记忆转化为长期记忆。框架实现了记忆的”升级”机制：工作记忆中频繁访问的信息可自动提升为情景记忆或语义记忆。
-遗忘（Forgetting）删除不重要或过时的信息。实现了 TTL 过期机制、容量限制策略、重要性评分淘汰等机制。
-RAG 系统设计RAG（检索增强生成）专注于外部知识的获取和利用，与记忆系统形成互补。
-架构设计HelloAgents RAG系统├── 文档处理层│   ├── DocumentProcessor - 多格式解析│   ├── Document - 元数据管理│   └── Pipeline - 端到端处理├── 嵌入表示层│   └── 复用记忆系统的嵌入服务├── 向量存储层│   └── QdrantVectorStore - 命名空间隔离└── 智能问答层    ├── 多策略检索 - 向量检索 + MQE + HyDE    ├── 上下文构建 - 智能片段合并    └── LLM增强生成 - 基于上下文问答
-
-与记忆系统的关系记忆系统和 RAG 系统被设计为两个独立的工具：
-
-memory_tool：存储和维护对话过程中的交互信息
-rag_tool：从知识库中检索相关信息作为上下文
-
-两者可以协同工作：RAG 检索到的重要信息可自动存储到记忆系统，形成知识的积累。
-工程实现考量存储后端选择
+规划能力
+动态调整，但缺乏全局视野
+全局规划，目标一致性强
 
 
-场景
-推荐方案
+灵活性
+高，可根据观察实时转向
+低，计划一旦生成就相对固定
+
+
+适用任务
+探索性、需要外部输入的任务
+结构性强、逻辑路径确定的任务
+
+
+局限性主要局限在于计划的”静态性”——如果执行中发现某步骤无法完成，缺乏动态重规划机制。这要求规划阶段的质量足够高，或者需要设计额外的异常处理逻辑。
+Reflection：自我反思与迭代优化核心思想Reflection 机制为智能体引入”事后自我校正循环”，使其能够审视自己的工作，发现不足，并进行迭代优化。灵感来源于人类的学习过程：完成初稿后校对，解出数学题后验算。
+工作流程三步循环：执行 → 反思 → 优化
+执行：使用 ReAct 或 Plan-and-Solve 等方法生成初步解决方案
+反思：调用独立的 LLM 实例扮演”评审员”，从多个维度评估：
+
+事实性错误：是否与已知事实相悖
+逻辑漏洞：推理过程是否连贯
+效率问题：是否有更优路径
+遗漏信息：是否忽略关键约束
+
+优化：将初稿和反馈作为新上下文，再次调用 LLM 进行修正
+形式化表达第 i 次迭代产生的输出 O_i，反思模型生成反馈 F_i：
+F_i = π_reflect(Task, O_i)
+
+优化模型生成新版本：
+O_&#123;i+1&#125; = π_refine(Task, O_i, F_i)
+
+循环直到反思不再发现问题，或达到预设迭代上限。
+适用场景
+代码生成与优化：从简单实现迭代到高效算法
+学术论文写作：多维度反思提升质量
+关键决策支持：需要高可靠性的场景
+
+成本收益分析成本：
+
+模型调用开销增加：每轮迭代至少额外两次调用
+任务延迟显著提高：串行过程延长总耗时
+提示工程复杂度上升：需为不同阶段设计专门提示词
+
+收益：
+
+解决方案质量的跃迁：从”合格”到”优秀”
+鲁棒性与可靠性增强：内部纠错机制
+
+结论：适合对结果质量要求极高、对实时性要求相对宽松的场景。
+范式选择策略
+
+
+任务特征
+推荐范式
 理由
 
 
 
-开发测试
-SQLite + 内存
-零配置，快速启动
+需要外部信息检索
+ReAct
+动态调用工具，实时获取数据
 
 
-生产环境
-Qdrant + Neo4j
-高性能，可扩展
+多步骤结构化推理
+Plan-and-Solve
+全局规划，避免迷失
 
 
-知识密集型
-Qdrant + Neo4j
-支持复杂关系查询
+对结果质量要求极高
+Reflection
+迭代优化，持续提升
 
 
-资源受限
-SQLite + TF-IDF
-轻量级，低资源占用
+快速响应优先
+ReAct 或 Plan-and-Solve
+避免 Reflection 的多轮迭代
 
 
-嵌入模型选择云端 API（如 DashScope）适合追求效果和便捷性的场景；本地模型适合对数据隐私有要求或需要离线部署的场景；TF-IDF 作为兜底方案，在无法使用深度模型时提供基础能力。
-性能优化策略
-批量处理：文档分块和向量化采用批量操作
-缓存机制：频繁访问的记忆项缓存到工作记忆
-异步索引：新记忆异步建立向量索引，不阻塞主流程
-命名空间隔离：不同用户&#x2F;会话使用独立命名空间
+复杂综合任务
+组合使用
+如 Plan-and-Solve + Reflection
+
 
 总结
-智能体记忆系统借鉴认知科学的多层级设计，实现不同特性的记忆类型
-四层架构（基础设施、记忆类型、存储后端、嵌入服务）实现了关注点分离
-多种存储后端和嵌入服务提供了灵活的技术选型空间
-RAG 系统与记忆系统互补，解决外部知识获取问题
-工程实现需在效果、性能、资源占用之间权衡
+ReAct 将推理与行动结合，适合需要动态交互的任务，优势在于灵活性和可解释性
+Plan-and-Solve 先规划后执行，适合结构化推理任务，优势在于目标一致性和稳定性
+Reflection 引入自我校正机制，适合高要求场景，以成本换取质量提升
+三种范式并非互斥，可根据任务特征组合使用
+选择范式时需权衡实时性要求、结果质量要求和任务复杂度
 
 ]]></content>
       <categories>
         <category>Agent学习笔记</category>
-      </categories>
-  </entry>
-  <entry>
-    <title>02_核心架构</title>
-    <url>/2026/04/11/02_%E6%A0%B8%E5%BF%83%E6%9E%B6%E6%9E%84/</url>
-    <content><![CDATA[Agent 核心架构
-架构决定Agent的能力边界与行为模式
-
-一、Agent架构概述1.1 基本范式：感知-决策-行动循环┌─────────────────────────────────────────────────────────────┐│                      Agent 主循环                            ││                                                              ││    ┌──────────┐    ┌──────────┐    ┌──────────┐            ││    │  感知    │───▶│  决策    │───▶│  行动    │            ││    │Perceive  │    │  Decide  │    │   Act    │            ││    └──────────┘    └──────────┘    └──────────┘            ││         ▲                                │                  ││         └────────────────────────────────┘                  ││                       反馈                                    │└─────────────────────────────────────────────────────────────┘
-
-1.2 Agent核心组件
-
-
-组件
-功能
-实现方式
-
-
-
-感知模块
-接收环境信息
-文本&#x2F;图像&#x2F;音频输入处理
-
-
-记忆模块
-存储历史信息
-短期记忆 + 长期记忆
-
-
-推理模块
-思考与规划
-LLM + Prompt Engineering
-
-
-工具模块
-执行具体操作
-Function Calling &#x2F; API调用
-
-
-行动模块
-输出结果
-文本生成 &#x2F; 工具调用
-
-
-
-二、ReAct架构（Reasoning + Acting）2.1 核心思想ReAct &#x3D; Reasoning（推理）+ Acting（行动）
-论文：ReAct: Synergizing Reasoning and Acting in Language Models (2022)
-┌─────────────────────────────────────────────────────────┐│                    ReAct 循环                            ││                                                          ││   Thought ──▶ Action ──▶ Observation ──▶ Thought        ││     │           │            │              │           ││   思考        执行         观察           再思考         ││                                                          │└─────────────────────────────────────────────────────────┘
-
-2.2 工作流程示例用户问题：北京今天天气怎么样？Thought: 我需要查询北京的天气信息Action: search(&quot;北京天气&quot;)Observation: 北京今天晴，气温15-25℃，空气质量良好Thought: 我已经获得了天气信息，可以回答用户了Action: finish(&quot;北京今天晴天，气温15-25℃，空气质量良好&quot;)
-
-2.3 ReAct代码实现class ReActAgent:    def __init__(self, llm, tools):        self.llm = llm        self.tools = &#123;tool.name: tool for tool in tools&#125;    def run(self, question: str, max_iterations: int = 10):        context = f&quot;Question: &#123;question&#125;\n&quot;        for _ in range(max_iterations):            response = self.llm.generate(context)            thought, action = self.parse_response(response)            context += f&quot;Thought: &#123;thought&#125;\nAction: &#123;action&#125;\n&quot;            if action.startswith(&quot;finish&quot;):                return self.extract_answer(action)            observation = self.execute_action(action)            context += f&quot;Observation: &#123;observation&#125;\n&quot;        return &quot;达到最大迭代次数&quot;
-
-2.4 ReAct优缺点
-
-
-优点
-缺点
-
-
-
-推理过程可解释
-迭代次数多时成本高
-
-
-灵活应对复杂任务
-容易陷入死循环
-
-
-可结合外部工具
-对Prompt质量敏感
-
-
-
-三、Plan-and-Execute架构3.1 核心思想先规划，后执行 —— 将复杂任务分解为子任务，逐一执行
-┌─────────────────────────────────────────────────────────┐│               Plan-and-Execute 架构                      ││                                                          ││   ┌─────────────┐         ┌─────────────┐              ││   │   Planner   │────────▶│  Executor   │              ││   │  (规划器)   │  计划    │  (执行器)   │              ││   └─────────────┘         └─────────────┘              ││         ▲                       │                       ││         └───────────────────────┘                       ││                   反馈与重规划                            │└─────────────────────────────────────────────────────────┘
-
-3.2 工作流程用户任务：帮我写一篇关于AI Agent的博客文章Step 1 - 规划阶段:  Plan:    1. 搜索AI Agent的最新发展动态    2. 整理Agent的核心概念和架构    3. 分析主流Agent框架    4. 撰写博客文章    5. 校对和润色Step 2 - 执行阶段:  Execute Task 1: 搜索完成，获得10篇相关文章  Execute Task 2: 整理完成，生成概念图谱  Execute Task 3: 分析完成，对比表格已生成  Execute Task 4: 文章初稿完成  Execute Task 5: 最终版本完成
-
-3.3 Plan-and-Execute代码实现class PlanAndExecuteAgent:    def __init__(self, planner_llm, executor_llm, tools):        self.planner = planner_llm        self.executor = executor_llm        self.tools = tools    def run(self, task: str):        plan = self.create_plan(task)        results = []        for step in plan:            result = self.execute_step(step)            results.append(result)            if self.need_replan(result):                plan = self.update_plan(plan, result)        return self.synthesize(results)    def execute_step(self, step: str):        executor = ReActAgent(self.executor, self.tools)        return executor.run(step)
-
-3.4 Plan-and-Execute vs ReAct
-
-
-维度
-ReAct
-Plan-and-Execute
-
-
-
-决策时机
-每步决策
-先整体规划
-
-
-适用任务
-探索性任务
-结构化任务
-
-
-效率
-较低
-较高
-
-
-灵活性
-高
-中等
-
-
-可预测性
-低
-高
-
-
-
-四、Reflexion架构（自我反思）4.1 核心思想执行 → 反思 → 改进 —— 从失败中学习
-论文：Reflexion: Language Agents with Verbal Reinforcement Learning (2023)
-┌─────────────────────────────────────────────────────────┐│                  Reflexion 架构                          ││                                                          ││   ┌────────┐    ┌────────┐    ┌────────┐              ││   │ Actor  │───▶│Evaluator│───▶│Reflector│             ││   │ 执行者 │    │ 评估者  │    │ 反思者  │             ││   └────────┘    └────────┘    └────────┘              ││       ▲              │              │                   ││       └──────────────┴──────────────┘                   ││              反馈与经验总结                               │└─────────────────────────────────────────────────────────┘
-
-4.2 工作流程class ReflexionAgent:    def __init__(self, actor, evaluator, reflector):        self.actor = actor        self.evaluator = evaluator        self.reflector = reflector        self.memory = []  # 存储反思经验    def run(self, task: str, max_trials: int = 3):        for trial in range(max_trials):            trajectory = self.actor.run(task, self.memory)            score, feedback = self.evaluator.evaluate(trajectory)            if score == 1.0:                return trajectory            reflection = self.reflector.reflect(task, trajectory, feedback)            self.memory.append(reflection)        return None
-
-4.3 反思示例任务：编写一个排序算法Trial 1:  Action: 编写冒泡排序  Result: 代码有bug，数组越界  Evaluation: 失败，得分 0.3  Reflection: 冒泡排序边界条件处理不当，需注意索引从0开始Trial 2:  Action: 修正冒泡排序边界条件  Result: 正确排序  Evaluation: 成功，得分 1.0
-
-
-五、多Agent协作架构5.1 为什么需要多Agent？
-
-
-单Agent局限
-多Agent优势
-
-
-
-角色混淆
-角色清晰分工
-
-
-上下文过长
-各自独立上下文
-
-
-难以并行
-可并行执行
-
-
-容易出错
-相互校验
-
-
-5.2 CAMEL架构Communicative Agents for “Mind” Exploration —— 角色扮演式协作
-┌─────────────────────────────────────────────────────────┐│                   CAMEL 架构                             ││                                                          ││   ┌─────────────┐              ┌─────────────┐         ││   │ AI User     │◀───请求─────│ AI Assistant │         ││   │ (用户角色)  │────回复────▶│ (助手角色)   │         ││   └─────────────┘              └─────────────┘         ││                                                          ││   通过角色扮演实现协作解决问题                             │└─────────────────────────────────────────────────────────┘
-
-5.3 MetaGPT架构软件公司模拟 —— 标准化工作流程
-┌─────────────────────────────────────────────────────────┐│                   MetaGPT 架构                           ││                                                          ││   ┌────────┐   ┌────────┐   ┌────────┐   ┌────────┐   ││   │Product │──▶│Architect│──▶│Project │──▶│Engineer│   ││   │Manager │   │        │   │Manager │   │        │   ││   └────────┘   └────────┘   └────────┘   └────────┘   ││       │            │            │            │         ││       ▼            ▼            ▼            ▼         ││   需求文档    架构设计    任务分配    代码实现         │└─────────────────────────────────────────────────────────┘
-
-5.4 多Agent协作模式
-
-
-模式
-描述
-适用场景
-
-
-
-顺序协作
-按流程依次执行
-软件开发流水线
-
-
-层级协作
-Manager分配任务给Worker
-复杂项目管理
-
-
-对等协作
-Agent间平等交流
-头脑风暴、讨论
-
-
-竞争协作
-多方案对比选择
-方案评审
-
-
-
-六、架构选择指南6.1 决策树               你的任务是什么类型？                     │     ┌───────────────┼───────────────┐     ▼               ▼               ▼ 探索性任务      结构化任务      复杂项目     │               │               │     ▼               ▼               ▼  ReAct      Plan-Execute    Multi-Agent     │               │               │     ▼               ▼               ▼需要反思改进？   需要验证？     需要专业分工？     │               │               │     ▼               ▼               ▼ Reflexion      +Evaluator    MetaGPT/CrewAI
-
-6.2 架构对比总表
-
-
-架构
-核心特点
-适用场景
-复杂度
-成本
-
-
-
-ReAct
-边思考边行动
-开放式问答、工具调用
-低
-中
-
-
-Plan-Execute
-先规划后执行
-多步骤任务、工作流
-中
-低-中
-
-
-Reflexion
-自我反思改进
-代码生成、复杂推理
-中
-高
-
-
-Multi-Agent
-角色分工协作
-软件开发、复杂项目
-高
-高
-
-
-6.3 组合使用实际项目中，架构往往组合使用：
-Multi-Agent System    │    ├── Planner Agent (Plan-Execute)    │       │    │       └── Executor Agent (ReAct + Reflexion)    │    └── Reviewer Agent (Reflexion)
-
-
-七、最佳实践7.1 架构设计原则
-简单优先：从简单架构开始，按需增加复杂度
-明确边界：每个Agent职责清晰，避免重叠
-可观测性：记录中间过程，便于调试
-容错设计：处理失败情况，支持重试和回退
-
-7.2 常见陷阱
-
-
-陷阱
-表现
-解决方案
-
-
-
-过度规划
-计划太细，无法执行
-保持计划粒度适中
-
-
-无限循环
-Agent反复执行同一动作
-设置最大迭代次数
-
-
-角色冲突
-多Agent职责不清
-明确定义角色边界
-
-
-上下文爆炸
-记忆过长导致遗忘
-实现记忆压缩机制
-
-
-
-参考资料
-ReAct: Synergizing Reasoning and Acting in Language Models
-Reflexion: Language Agents with Verbal Reinforcement Learning
-CAMEL: Communicative Agents for “Mind” Exploration
-MetaGPT: Meta Programming for A Multi-Agent Collaborative Framework
-
-]]></content>
-      <categories>
-        <category>Agent学习笔记</category>
-      </categories>
-  </entry>
-  <entry>
-    <title>03_关键技术</title>
-    <url>/2026/04/11/03_%E5%85%B3%E9%94%AE%E6%8A%80%E6%9C%AF/</url>
-    <content><![CDATA[Agent 关键技术
-本章深入探讨Agent的核心技术组件，这些技术是构建智能Agent的基石。
-
-
-一、Tool Use（工具调用）工具调用是Agent区别于普通LLM的核心能力，它让Agent能够与外部世界交互，执行具体操作。
-1.1 Function Calling 机制Function Calling 是LLM与外部工具交互的标准机制。其核心流程如下：
-用户请求 → LLM分析意图 → 选择合适工具 → 生成结构化参数 → 执行工具 → 返回结果 → LLM整合回复
-
-工作机制：
-
-工具注册：将可用工具的schema注册到系统中
-意图理解：LLM根据用户输入判断是否需要调用工具
-参数生成：LLM生成符合工具要求的结构化参数
-执行调用：系统执行工具并获取结果
-结果整合：LLM将工具结果整合到最终回复中
-
-核心代码示例：
-import jsonfrom anthropic import Anthropicclient = Anthropic()# 定义工具tools = [    &#123;        &quot;name&quot;: &quot;get_weather&quot;,        &quot;description&quot;: &quot;获取指定城市的天气信息&quot;,        &quot;input_schema&quot;: &#123;            &quot;type&quot;: &quot;object&quot;,            &quot;properties&quot;: &#123;                &quot;city&quot;: &#123;                    &quot;type&quot;: &quot;string&quot;,                    &quot;description&quot;: &quot;城市名称&quot;                &#125;,                &quot;unit&quot;: &#123;                    &quot;type&quot;: &quot;string&quot;,                    &quot;enum&quot;: [&quot;celsius&quot;, &quot;fahrenheit&quot;],                    &quot;description&quot;: &quot;温度单位&quot;                &#125;            &#125;,            &quot;required&quot;: [&quot;city&quot;]        &#125;    &#125;]# 发送请求response = client.messages.create(    model=&quot;claude-3-opus-20240229&quot;,    messages=[&#123;&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;北京今天天气怎么样?&quot;&#125;],    tools=tools)# 处理工具调用if response.stop_reason == &quot;tool_use&quot;:    for block in response.content:        if block.type == &quot;tool_use&quot;:            tool_name = block.name            tool_input = block.input            result = execute_tool(tool_name, tool_input)
-
-1.2 工具定义与描述工具定义的质量直接影响LLM选择和调用的准确性。一个优秀的工具定义需要：
-
-清晰的语义：名称和描述准确传达工具功能
-完整的Schema：参数定义完整、类型明确、约束清晰
-充分的示例：通过示例说明典型用法
-
-工具定义标准结构：
-class ToolDefinition:    &quot;&quot;&quot;工具定义的标准结构&quot;&quot;&quot;    name: str              # 工具名称，建议使用snake_case    description: str       # 功能描述，说明工具的作用和使用场景    input_schema: dict     # JSON Schema格式的参数定义    output_schema: dict    # 可选：返回值结构定义    def execute(self, **kwargs):        &quot;&quot;&quot;工具的实际执行逻辑&quot;&quot;&quot;        raise NotImplementedError
-
-优秀描述示例：
-# 好的描述&#123;    &quot;name&quot;: &quot;search_web&quot;,    &quot;description&quot;: &quot;在互联网上搜索信息。当用户询问实时新闻、最新数据、或需要查询互联网上的具体信息时使用。&quot;,    &quot;input_schema&quot;: &#123;        &quot;type&quot;: &quot;object&quot;,        &quot;properties&quot;: &#123;            &quot;query&quot;: &#123;                &quot;type&quot;: &quot;string&quot;,                &quot;description&quot;: &quot;搜索关键词，建议使用简洁明确的查询语句&quot;            &#125;,            &quot;num_results&quot;: &#123;                &quot;type&quot;: &quot;integer&quot;,                &quot;description&quot;: &quot;返回结果数量，默认为5&quot;,                &quot;default&quot;: 5,                &quot;minimum&quot;: 1,                &quot;maximum&quot;: 20            &#125;        &#125;,        &quot;required&quot;: [&quot;query&quot;]    &#125;&#125;# 差的描述&#123;    &quot;name&quot;: &quot;search&quot;,  # 名称不明确    &quot;description&quot;: &quot;搜索&quot;,  # 描述过于简单    &quot;input_schema&quot;: &#123;        &quot;type&quot;: &quot;object&quot;,        &quot;properties&quot;: &#123;            &quot;q&quot;: &#123;&quot;type&quot;: &quot;string&quot;&#125;  # 参数名不清晰，缺少描述        &#125;    &#125;&#125;
-
-1.3 工具选择策略当可用工具众多时，如何让LLM高效选择合适的工具成为关键挑战。
-主要策略：
-
-
-
-策略
-描述
-适用场景
-
-
-
-全量注入
-将所有工具schema加入prompt
-工具数量少（&lt;20）
-
-
-语义检索
-根据查询语义检索相关工具
-工具数量多（&gt;20）
-
-
-分层路由
-先选择工具类别，再选择具体工具
-工具有明确分类
-
-
-多阶段选择
-先粗选，再精细筛选
-需要高精度选择
-
-
-语义检索示例：
-from sentence_transformers import SentenceTransformerimport numpy as npclass ToolSelector:    def __init__(self, tools: list[ToolDefinition]):        self.tools = tools        self.encoder = SentenceTransformer(&#x27;all-MiniLM-L6-v2&#x27;)        # 预计算工具描述的嵌入向量        self.tool_embeddings = self.encoder.encode(            [t.description for t in tools]        )    def select_tools(self, query: str, top_k: int = 5):        &quot;&quot;&quot;根据查询选择最相关的工具&quot;&quot;&quot;        query_embedding = self.encoder.encode(query)        similarities = np.dot(self.tool_embeddings, query_embedding)        top_indices = np.argsort(similarities)[-top_k:]        return [self.tools[i] for i in top_indices]
-
-
-二、Memory（记忆系统）记忆系统让Agent能够保持上下文连贯性，积累经验，实现长期学习。
-2.1 短期记忆 vs 长期记忆Agent的记忆系统类比人类记忆，分为不同层次：
-┌─────────────────────────────────────────────────────┐│                   记忆系统架构                        │├─────────────────────────────────────────────────────┤│  工作记忆（Working Memory）                          ││  - 当前对话上下文                                     ││  - 临时推理状态                                       ││  - 容量有限，实时更新                                  │├─────────────────────────────────────────────────────┤│  短期记忆（Short-term Memory）                       ││  - 最近N轮对话                                       ││  - 会话级别信息                                       ││  - 滑动窗口管理                                       │├─────────────────────────────────────────────────────┤│  长期记忆（Long-term Memory）                        ││  - 用户偏好和历史交互                                  ││  - 知识库和经验库                                     ││  - 持久化存储                                         │└─────────────────────────────────────────────────────┘
-
-对比分析：
-
-
-
-维度
-短期记忆
-长期记忆
-
-
-
-存储位置
-内存&#x2F;上下文窗口
-向量数据库&#x2F;持久化存储
-
-
-容量
-受上下文窗口限制
-理论无限
-
-
-访问速度
-快速（毫秒级）
-较慢（检索需要时间）
-
-
-更新频率
-每轮对话更新
-定期或触发式更新
-
-
-信息类型
-原始对话文本
-提取的知识和摘要
-
-
-检索方式
-顺序访问
-语义检索
-
-
-记忆管理实现：
-from dataclasses import dataclassfrom datetime import datetimefrom typing import Optional@dataclassclass Memory:    &quot;&quot;&quot;记忆单元&quot;&quot;&quot;    content: str                    # 记忆内容    timestamp: datetime             # 创建时间    importance: float               # 重要性评分 (0-1)    memory_type: str                # &#x27;short_term&#x27; | &#x27;long_term&#x27;    metadata: dict                  # 额外元数据    embedding: Optional[list] = None  # 向量嵌入class MemoryManager:    def __init__(self, max_short_term: int = 50):        self.short_term_memory: list[Memory] = []        self.long_term_memory_store = None        self.max_short_term = max_short_term    def add_memory(self, content: str, importance: float = 0.5):        &quot;&quot;&quot;添加新记忆&quot;&quot;&quot;        memory = Memory(            content=content,            timestamp=datetime.now(),            importance=importance,            memory_type=&#x27;short_term&#x27;,            metadata=&#123;&#125;        )        self.short_term_memory.append(memory)        # 短期记忆溢出时，转移到长期记忆        if len(self.short_term_memory) &gt; self.max_short_term:            self._consolidate_memory()    def _consolidate_memory(self):        &quot;&quot;&quot;记忆巩固：将短期记忆转移到长期记忆&quot;&quot;&quot;        to_transfer = len(self.short_term_memory) - self.max_short_term // 2        for _ in range(to_transfer):            memory = self.short_term_memory.pop(0)            if memory.importance &gt; 0.3:                self._save_to_long_term(memory)    def recall(self, query: str, top_k: int = 5) -&gt; list[Memory]:        &quot;&quot;&quot;检索相关记忆&quot;&quot;&quot;        recent = self.short_term_memory[-top_k:]        if self.long_term_memory_store:            long_term = self.long_term_memory_store.search(query, top_k)            return recent + long_term        return recent
-
-2.2 记忆存储与检索高效的记忆存储与检索是记忆系统的核心。
-存储策略：
-
-重要性加权：根据内容重要性决定存储优先级
-遗忘机制：模拟人类遗忘，定期清理低价值记忆
-压缩存储：对相似记忆进行合并和摘要
-
-检索策略：
-
-语义相似度检索：基于向量相似度找相关记忆
-时间衰减：最近记忆权重更高
-重要性加权：重要记忆更容易被检索
-
-import numpy as npfrom datetime import datetimeclass MemoryRetriever:    def __init__(self, decay_factor: float = 0.95):        self.decay_factor = decay_factor    def retrieve_with_decay(        self,        query_embedding: np.ndarray,        memories: list[Memory],        top_k: int = 5    ) -&gt; list[tuple[Memory, float]]:        &quot;&quot;&quot;带时间衰减的记忆检索&quot;&quot;&quot;        scores = []        now = datetime.now()        for memory in memories:            # 语义相似度            semantic_score = np.dot(query_embedding, memory.embedding) if memory.embedding else 0            # 时间衰减            time_diff = (now - memory.timestamp).total_seconds() / 3600            time_decay = self.decay_factor ** time_diff            # 重要性权重            importance_weight = memory.importance            # 综合得分            final_score = semantic_score * time_decay * importance_weight            scores.append((memory, final_score))        scores.sort(key=lambda x: x[1], reverse=True)        return scores[:top_k]
-
-2.3 向量数据库的应用向量数据库是长期记忆存储的核心技术，支持高效的语义检索。
-核心概念：
-文本 → Embedding模型 → 向量表示 → 向量数据库 → 相似度检索
-
-主流向量数据库：
-
-
-
-数据库
-特点
-适用场景
-
-
-
-Pinecone
-托管服务，易用
-生产环境快速部署
-
-
-Milvus
-开源，高性能
-大规模生产环境
-
-
-Chroma
-轻量，易集成
-开发测试、小规模应用
-
-
-Weaviate
-支持混合检索
-需要结构化+向量检索
-
-
-Qdrant
-Rust实现，高效
-高性能要求场景
-
-
-
-三、Planning（规划能力）规划能力让Agent能够分解复杂任务，制定执行策略，是智能行为的核心。
-3.1 任务分解任务分解是将复杂目标拆解为可执行子任务的过程。
-分解策略：
-┌────────────────────────────────────────────────────┐│                任务分解方法                         │├────────────────────────────────────────────────────┤│  目标驱动分解                                       ││  - 从最终目标出发，逆向推导子目标                     ││  - 每个子目标完成后更接近最终目标                     │├────────────────────────────────────────────────────┤│  功能驱动分解                                       ││  - 按功能模块划分任务                               ││  - 各子任务相对独立                                 │├────────────────────────────────────────────────────┤│  时序驱动分解                                       ││  - 按执行顺序分解                                   ││  - 存在明确的依赖关系                               │├────────────────────────────────────────────────────┤│  层次化分解（HTN）                                  ││  - 高层任务分解为中层方法                           ││  - 中层方法分解为原子操作                           │└────────────────────────────────────────────────────┘
-
-任务分解实现：
-from dataclasses import dataclassfrom typing import List, Optionalfrom enum import Enumclass TaskStatus(Enum):    PENDING = &quot;pending&quot;    IN_PROGRESS = &quot;in_progress&quot;    COMPLETED = &quot;completed&quot;    FAILED = &quot;failed&quot;@dataclassclass Task:    id: str    description: str    status: TaskStatus = TaskStatus.PENDING    subtasks: List[&#x27;Task&#x27;] = None    dependencies: List[str] = None    result: Optional[str] = None    def __post_init__(self):        if self.subtasks is None:            self.subtasks = []        if self.dependencies is None:            self.dependencies = []class TaskPlanner:    def __init__(self, llm_client):        self.llm = llm_client    def decompose_task(self, goal: str) -&gt; Task:        &quot;&quot;&quot;使用LLM分解任务&quot;&quot;&quot;        prompt = f&quot;&quot;&quot;        请将以下目标分解为具体的子任务。        目标：&#123;goal&#125;        要求：        1. 每个子任务应该是可独立执行的最小单元        2. 明确子任务之间的依赖关系        3. 按执行顺序排列        以JSON格式输出：        &#123;&#123;            &quot;main_task&quot;: &quot;任务描述&quot;,            &quot;subtasks&quot;: [                &#123;&#123;                    &quot;id&quot;: &quot;1&quot;,                    &quot;description&quot;: &quot;子任务描述&quot;,                    &quot;dependencies&quot;: []                &#125;&#125;            ]        &#125;&#125;        &quot;&quot;&quot;        response = self.llm.generate(prompt)        return self._build_task_tree(parse_json(response))    def get_executable_tasks(self, task: Task) -&gt; List[Task]:        &quot;&quot;&quot;获取当前可执行的任务&quot;&quot;&quot;        executable = []        completed_ids = &#123;t.id for t in task.subtasks if t.status == TaskStatus.COMPLETED&#125;        for subtask in task.subtasks:            if subtask.status == TaskStatus.PENDING:                if all(dep in completed_ids for dep in subtask.dependencies):                    executable.append(subtask)        return executable
-
-3.2 思维链（Chain of Thought）思维链（CoT） 是一种让LLM显式展示推理过程的技术，提高复杂问题的解决质量。
-核心思想：
-问题 → [推理步骤1] → [推理步骤2] → ... → 答案
-
-而不是直接：问题 → 答案
-思维链类型：
-
-
-
-类型
-描述
-适用场景
-
-
-
-Zero-shot CoT
-仅提示”一步步思考”
-通用场景
-
-
-Few-shot CoT
-提供带推理的示例
-需要特定格式
-
-
-Self-Consistency
-多次采样取一致答案
-需要高可靠性
-
-
-Tree of Thoughts
-探索多条推理路径
-复杂决策问题
-
-
-实现示例：
-class ChainOfThought:    def __init__(self, llm_client):        self.llm = llm_client    def reason(self, question: str) -&gt; dict:        &quot;&quot;&quot;使用思维链进行推理&quot;&quot;&quot;        prompt = f&quot;&quot;&quot;        请一步步分析并回答以下问题。        问题：&#123;question&#125;        请按以下格式回答：        思考过程：        1. 首先，...        2. 然后，...        3. 接着，...        最终答案：...        &quot;&quot;&quot;        response = self.llm.generate(prompt)        return self._parse_response(response)    def reason_with_verification(self, question: str) -&gt; dict:        &quot;&quot;&quot;带自我验证的思维链&quot;&quot;&quot;        first_reasoning = self.reason(question)        verification_prompt = f&quot;&quot;&quot;        请验证以下推理过程是否正确：        问题：&#123;question&#125;        推理过程：&#123;first_reasoning[&#x27;reasoning_steps&#x27;]&#125;        答案：&#123;first_reasoning[&#x27;answer&#x27;]&#125;        请检查：        1. 推理步骤是否有逻辑错误        2. 是否遗漏重要信息        3. 答案是否合理        &quot;&quot;&quot;        verification = self.llm.generate(verification_prompt)        return &#123;**first_reasoning, &quot;verification&quot;: verification&#125;
-
-3.3 树搜索策略对于复杂决策问题，单一路径的推理可能不足，需要探索多个可能的路径。
-主要方法：
-┌─────────────────────────────────────────────────────┐│                 树搜索策略                           │├─────────────────────────────────────────────────────┤│  Tree of Thoughts (ToT)                             ││  - 生成多个候选思路                                  ││  - 评估每个思路的价值                                ││  - 选择最优路径继续探索                              │├─────────────────────────────────────────────────────┤│  MCTS (蒙特卡洛树搜索)                               ││  - 选择 → 扩展 → 模拟 → 回溯                        ││  - 平衡探索与利用                                    ││  - 适用于决策空间大的问题                            │├─────────────────────────────────────────────────────┤│  Beam Search                                        ││  - 每步保留top-k个候选                              ││  - 高效但可能错过最优解                             │├─────────────────────────────────────────────────────┤│  Best-First Search                                  ││  - 优先扩展最有希望的节点                            ││  - 使用启发式函数评估                               │└─────────────────────────────────────────────────────┘
-
-
-四、RAG与Agent结合检索增强生成（RAG） 为Agent提供知识支持，增强其解决问题的能力。
-4.1 知识增强RAG通过检索外部知识库，为Agent提供准确的、最新的信息支持。
-Agent + RAG 架构：
-┌─────────────────────────────────────────────────────┐│                Agent + RAG 架构                      │├─────────────────────────────────────────────────────┤│                                                     ││  用户查询 ──→ Agent ──→ 判断是否需要检索            ││                │                                    ││                ├─→ 需要检索 ──→ 生成检索查询        ││                │                    │               ││                │                    ↓               ││                │              向量数据库             ││                │                    │               ││                │                    ↓               ││                │              检索结果 ──→ 整合     ││                │                                    ││                └─→ 生成最终回答                      ││                                                     │└─────────────────────────────────────────────────────┘
-
-RAG Agent 实现：
-class RAGAgent:    def __init__(self, llm_client, vector_store, embedding_model):        self.llm = llm_client        self.vector_store = vector_store        self.embedder = embedding_model    def process_query(self, query: str) -&gt; str:        &quot;&quot;&quot;处理用户查询&quot;&quot;&quot;        # 判断是否需要检索        if not self._needs_retrieval(query):            return self._direct_answer(query)        # 生成检索查询        search_queries = self._generate_search_queries(query)        # 执行检索        contexts = []        for sq in search_queries:            contexts.extend(self._retrieve(sq))        # 去重和重排序        contexts = self._deduplicate(contexts)        contexts = self._rerank(query, contexts)        # 生成回答        return self._generate_answer(query, contexts[:5])    def _needs_retrieval(self, query: str) -&gt; bool:        &quot;&quot;&quot;判断查询是否需要检索外部知识&quot;&quot;&quot;        prompt = f&quot;&quot;&quot;        判断以下问题是否需要查询外部知识库来回答。        如果问题涉及具体事实、数据、或最新信息，回答&quot;是&quot;。        如果是通用知识或常识问题，回答&quot;否&quot;。        问题：&#123;query&#125;        只回答&quot;是&quot;或&quot;否&quot;。        &quot;&quot;&quot;        return &quot;是&quot; in self.llm.generate(prompt)
-
-4.2 动态检索动态检索根据Agent执行过程中的实际需要，实时检索相关信息。
-应用场景：
-
-工具使用前检索：查询工具使用文档
-代码生成时检索：检索相关API和代码示例
-决策时检索：检索历史案例和最佳实践
-
-
-五、自我修正与错误恢复智能Agent需要具备自我诊断和修正错误的能力，这是实现可靠性的关键。
-5.1 自我修正机制自我修正让Agent能够检测并纠正自己的错误，形成”执行-验证-修正“的闭环。
-┌─────────────────────────────────────────────────────┐│               自我修正流程                           │├─────────────────────────────────────────────────────┤│                                                     ││  执行任务 ──→ 结果验证 ──→ 发现错误？               ││                │              │                     ││                │              ├─→ 否 ──→ 返回结果   ││                │              │                     ││                │              └─→ 是                ││                │                    │               ││                │                    ↓               ││                │              错误分析              ││                │                    │               ││                │                    ↓               ││                │              生成修正方案          ││                │                    │               ││                └────────────────────┘               ││                                                     │└─────────────────────────────────────────────────────┘
-
-实现示例：
-from dataclasses import dataclassfrom enum import Enumclass ErrorType(Enum):    EXECUTION_ERROR = &quot;execution_error&quot;    OUTPUT_ERROR = &quot;output_error&quot;    LOGIC_ERROR = &quot;logic_error&quot;    RESOURCE_ERROR = &quot;resource_error&quot;@dataclassclass ErrorInfo:    error_type: ErrorType    description: str    context: dict    suggestion: str = Noneclass SelfCorrectionAgent:    def __init__(self, llm_client, max_retries: int = 3):        self.llm = llm_client        self.max_retries = max_retries    def execute_with_correction(self, task: str, executor: callable) -&gt; Any:        &quot;&quot;&quot;带自我修正的任务执行&quot;&quot;&quot;        for attempt in range(self.max_retries):            try:                result = executor(task)                validation = self._validate_result(task, result)                if validation[&quot;valid&quot;]:                    return result                error = self._analyze_error(task, result, validation)                task = self._generate_correction(task, error, result)            except Exception as e:                error = ErrorInfo(                    error_type=ErrorType.EXECUTION_ERROR,                    description=str(e),                    context=&#123;&quot;attempt&quot;: attempt&#125;                )                task = self._generate_correction(task, error, None)        raise Exception(f&quot;经过&#123;self.max_retries&#125;次尝试后仍无法完成任务&quot;)
-
-5.2 错误恢复策略恢复策略：
-
-
-
-策略
-描述
-适用场景
-
-
-
-重试
-简单重新执行
-临时性错误
-
-
-回退
-回到上一个稳定状态
-部分执行失败
-
-
-替代路径
-使用备选方案
-主路径失败
-
-
-降级
-简化任务目标
-资源不足
-
-
-人工介入
-请求人类帮助
-无法自动恢复
-
-
-5.3 错误预防与监控主动的错误预防和实时监控可以减少错误发生。
-class AgentMonitor:    def __init__(self):        self.metrics = &#123;&#125;        self.alert_handlers = []    def register_metric(self, name: str, threshold: float):        &quot;&quot;&quot;注册监控指标&quot;&quot;&quot;        self.metrics[name] = &#123;            &quot;threshold&quot;: threshold,            &quot;values&quot;: [],            &quot;status&quot;: &quot;healthy&quot;        &#125;    def record_metric(self, name: str, value: float):        &quot;&quot;&quot;记录指标值&quot;&quot;&quot;        if name in self.metrics:            self.metrics[name][&quot;values&quot;].append(&#123;                &quot;value&quot;: value,                &quot;timestamp&quot;: datetime.now()            &#125;)            threshold = self.metrics[name][&quot;threshold&quot;]            if value &gt; threshold:                self.metrics[name][&quot;status&quot;] = &quot;critical&quot;                self._trigger_alert(name, value, threshold)            elif value &gt; threshold * 0.8:                self.metrics[name][&quot;status&quot;] = &quot;warning&quot;    def check_health(self) -&gt; dict:        &quot;&quot;&quot;健康检查&quot;&quot;&quot;        return &#123;            name: &#123;                &quot;status&quot;: data[&quot;status&quot;],                &quot;latest_value&quot;: data[&quot;values&quot;][-1][&quot;value&quot;] if data[&quot;values&quot;] else None            &#125;            for name, data in self.metrics.items()        &#125;
-
-
-总结Agent的关键技术构成了智能系统的核心能力：
-
-
-
-技术
-核心价值
-关键挑战
-
-
-
-Tool Use
-扩展能力边界
-工具选择、参数生成
-
-
-Memory
-保持连贯性
-存储效率、检索精度
-
-
-Planning
-处理复杂任务
-任务分解、执行调度
-
-
-RAG
-知识增强
-检索时机、信息整合
-
-
-自我修正
-提高可靠性
-错误检测、恢复策略
-
-
-这些技术相互协作，共同支撑Agent的智能行为。在实际应用中，需要根据具体场景选择合适的技术组合和实现方式。
-]]></content>
-      <categories>
-        <category>Agent学习笔记</category>
-      </categories>
-  </entry>
-  <entry>
-    <title>04_框架与工具</title>
-    <url>/2026/04/11/04_%E6%A1%86%E6%9E%B6%E4%B8%8E%E5%B7%A5%E5%85%B7/</url>
-    <content><![CDATA[Agent框架与工具本文介绍主流Agent开发框架和工具，帮助开发者选择适合的技术栈。
-1. LangChain &#x2F; LangGraph核心概念LangChain 是最流行的LLM应用开发框架，核心组件：
-
-
-
-概念
-说明
-
-
-
-Chain
-将多个组件串联成序列，实现复杂工作流
-
-
-Prompt Template
-动态生成提示词的模板系统
-
-
-Memory
-对话历史和上下文管理
-
-
-Retriever
-从向量数据库检索相关信息
-
-
-Tool
-Agent可调用的外部功能接口
-
-
-Agent
-使用LLM决定行动序列的智能体
-
-
-LangGraph 是LangChain团队的Agent编排框架，核心抽象：
-
-StateGraph：基于状态的图结构
-Node：执行具体操作的节点
-Edge：节点间的转换条件
-Conditional Edge：根据状态动态路由
-
-Agent构建方式方式一：AgentExecutor（传统方式）
-from langchain.agents import create_react_agent, AgentExecutorfrom langchain.tools import Tooltools = [    Tool(name=&quot;Calculator&quot;, func=calculator, description=&quot;用于数学计算&quot;),    Tool(name=&quot;Search&quot;, func=search, description=&quot;搜索互联网信息&quot;)]agent = create_react_agent(llm, tools, prompt)agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)result = agent_executor.invoke(&#123;&quot;input&quot;: &quot;计算25的平方根&quot;&#125;)
-
-方式二：LangGraph（推荐方式）
-from langgraph.graph import StateGraph, ENDfrom typing import TypedDictclass AgentState(TypedDict):    messages: list    next_action: strdef think(state: AgentState) -&gt; AgentState:    &quot;&quot;&quot;推理节点：决定下一步行动&quot;&quot;&quot;    return statedef act(state: AgentState) -&gt; AgentState:    &quot;&quot;&quot;执行节点：调用工具&quot;&quot;&quot;    return stateworkflow = StateGraph(AgentState)workflow.add_node(&quot;think&quot;, think)workflow.add_node(&quot;act&quot;, act)workflow.add_edge(&quot;think&quot;, &quot;act&quot;)workflow.add_conditional_edges(&quot;act&quot;, lambda s: s[&quot;next_action&quot;], &#123;&quot;continue&quot;: &quot;think&quot;, &quot;finish&quot;: END&#125;)app = workflow.compile()
-
-优缺点分析
-
-
-维度
-优点
-缺点
-
-
-
-学习曲线
-文档丰富，社区活跃
-概念较多，入门需时间
-
-
-灵活性
-组件化设计，可自由组合
-过度抽象增加复杂度
-
-
-生产就绪
-支持流式输出、错误处理
-版本迭代快，API变化频繁
-
-
-生态系统
-集成100+工具和服务
-依赖较多，bundle较大
-
-
-适用场景：复杂RAG应用、精细控制Agent工作流、企业级生产环境。
-
-2. AutoGPT &#x2F; BabyAGI自主Agent先驱AutoGPT（2023年3月）是第一个真正意义上的自主Agent：
-核心循环：目标(Goals) → 思考(Think) → 决定(Decide) → 执行(Act) → 评估(Evaluate) → 循环
-
-BabyAGI 专注于任务驱动，三大组件：
-
-Task Execution Agent：执行当前任务
-Task Enrichment：存储结果到向量库
-Task Creation Agent：基于目标生成新任务
-
-架构对比
-
-
-特性
-AutoGPT
-BabyAGI
-
-
-
-自主程度
-高度自主，可运行数小时
-相对保守，任务驱动
-
-
-记忆系统
-本地文件 + 向量存储
-向量存储为主
-
-
-资源消耗
-较高
-相对较低
-
-
-核心创新：实现”目标→任务分解→执行”闭环，引入自我反思能力。
-局限性：容易无限循环、成本难控、质量不稳定。
-
-3. CrewAI多Agent协作CrewAI专注于多Agent协作系统，让专业Agent协同完成任务：
-架构：Crew(团队)├── Agent 1 (研究员)  ─┐├── Agent 2 (分析师)  ─┼── Task Pipeline└── Agent 3 (撰稿人)  ─┘
-
-角色定义与任务from crewai import Agent, Task, Crewresearcher = Agent(    role=&quot;高级研究员&quot;,    goal=&quot;深入研究主题，收集全面信息&quot;,    tools=[search_tool, scrape_tool])analyst = Agent(    role=&quot;数据分析师&quot;,    goal=&quot;分析数据，发现洞察&quot;,    allow_delegation=True)writer = Agent(    role=&quot;技术撰稿人&quot;,    goal=&quot;撰写清晰、有吸引力的内容&quot;)# 创建任务流程tasks = [    Task(description=&quot;研究AI Agent最新发展&quot;, agent=researcher),    Task(description=&quot;分析研究结果&quot;, agent=analyst, context=[tasks[0]]),    Task(description=&quot;撰写技术文章&quot;, agent=writer, context=[tasks[1]])]crew = Crew(agents=[researcher, analyst, writer], tasks=tasks)result = crew.kickoff()
-
-协作模式
-
-
-模式
-描述
-适用场景
-
-
-
-顺序执行
-任务按顺序依次执行
-流水线工作流
-
-
-层级管理
-Manager分配任务
-复杂项目管理
-
-
-共识决策
-Agent投票决定
-多角度判断
-
-
-自主协作
-Agent自主沟通
-开放式问题解决
-
-
-
-4. MetaGPT软件公司模拟MetaGPT将软件公司角色分工引入Agent系统：
-产品经理(PRD) → 架构师(系统设计) → 项目经理(任务分解) → 工程师(代码实现) → QA(测试验证)
-
-SOP工作流**标准操作流程（SOP）**是MetaGPT的核心创新：
-from metagpt.roles import ProductManager, Architect, Engineer, QaEngineerfrom metagpt.team import Teamasync def create_software():    team = Team()    team.hire([ProductManager(), Architect(), Engineer(), QaEngineer()])    await team.run(idea=&quot;开发一个待办事项应用&quot;)# 产出物：PRD、系统设计、API文档、源代码、测试用例
-
-SOP价值对比：
-
-
-
-传统Agent
-MetaGPT SOP
-
-
-
-随机性强，输出不稳定
-流程标准化，输出规范
-
-
-缺乏验证环节
-多角色交叉验证
-
-
-单一Agent易出错
-多角色分工协作
-
-
-
-5. 其他重要框架Microsoft AutoGen多Agent对话框架，特色功能：
-
-对话模式：Agent间自然语言协作
-代码执行：内置沙箱环境
-人类介入：支持人在循环中参与
-群聊模式：多Agent群组讨论
-
-OpenAI Assistants API托管Agent服务：
-
-
-
-优势
-限制
-
-
-
-完全托管，无需维护
-依赖OpenAI生态
-
-
-内置代码解释器
-自定义能力有限
-
-
-持久化对话状态
-成本较高
-
-
-Claude MCP标准化工具连接协议，核心概念：
-
-Resources：可读取的数据源
-Tools：可调用的功能
-Prompts：预定义的提示模板
-
-MCP价值：统一工具接口标准、一次开发多端使用、降低Agent开发门槛。
-
-6. 框架选型指南框架对比
-
-
-框架
-定位
-多Agent
-学习曲线
-适用场景
-
-
-
-LangChain
-通用框架
-支持
-中等
-企业应用、RAG
-
-
-LangGraph
-工作流编排
-支持
-较高
-复杂Agent系统
-
-
-AutoGPT
-自主Agent
-单体
-低
-实验探索
-
-
-CrewAI
-团队协作
-原生
-低
-内容创作、研究
-
-
-MetaGPT
-软件开发
-原生
-中
-代码生成
-
-
-AutoGen
-对话协作
-原生
-中
-研究实验
-
-
-Assistants API
-托管服务
-单体
-低
-快速原型
-
-
-选型决策完全托管服务？ → OpenAI Assistants API代码生成场景？ → MetaGPT多Agent协作 + 角色分工明确？ → CrewAI多Agent协作 + 需要对话协商？ → AutoGen精细控制工作流？ → LangGraph快速原型开发？ → LangChain AgentExecutor学习研究？ → BabyAGI / AutoGPT
-
-组合使用建议企业级Agent系统：LangGraph + LangChain + MCP + LangSmith
-内容生产平台：CrewAI + LangChain Tools + 向量数据库
-代码助手：MetaGPT + GitHub MCP + 自定义工具
-
-总结框架选择需考虑：需求匹配度、团队能力、生产就绪度、社区生态、长期维护。建议从简单场景入手，逐步深入，在实践中形成适合团队的选型标准。
-]]></content>
-      <categories>
-        <category>Agent学习笔记</category>
-      </categories>
-  </entry>
-  <entry>
-    <title>什么是Agent</title>
-    <url>/2026/04/09/%E4%BB%80%E4%B9%88%E6%98%AFAgent/</url>
-    <content><![CDATA[Agent 学习笔记这个分类记录我在 AI Agent 领域的学习过程。
-内容包括：
-
-RAG（检索增强生成）
-Claude Code 使用技巧
-Agent 架构与设计模式
-MCP、Tool Use 等前沿技术
-
-持续更新中，欢迎交流！
-]]></content>
-      <categories>
-        <category>Agent学习笔记</category>
-      </categories>
-  </entry>
-  <entry>
-    <title>关于作品集</title>
-    <url>/2026/04/09/%E5%85%B3%E4%BA%8E%E4%BD%9C%E5%93%81%E9%9B%86/</url>
-    <content><![CDATA[作品集这里展示我的个人项目与作品。
-包括：
-
-独立开发的小工具
-有趣的编程项目
-其他创意作品
-
-每个作品都记录了从想法到实现的过程。
-]]></content>
-      <categories>
-        <category>作品集</category>
       </categories>
   </entry>
 </search>

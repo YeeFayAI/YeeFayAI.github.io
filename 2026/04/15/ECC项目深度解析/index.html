@@ -1,0 +1,631 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>ECC项目深度解析 | BergAIhub</title><meta name="author" content="BergAIhub"><meta name="copyright" content="BergAIhub"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#F2EDF7"><meta name="description" content="Everything Claude Code (ECC) 深度解析 这篇文章系统解析 everything-claude-code 项目的核心机制，包括 Agent 触发、Hooks 系统、Commands 调用等关键概念，帮助你理解这个 Claude Code 插件库是如何工作的。  一、项目概述ECC 是什么？everything-claude-code（简称 ECC）是一个 Claude C">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ECC项目深度解析">
+<meta property="og:url" content="https://bergaihub.github.io/2026/04/15/ECC%E9%A1%B9%E7%9B%AE%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/index.html">
+<meta property="og:site_name" content="BergAIhub">
+<meta property="og:description" content="Everything Claude Code (ECC) 深度解析 这篇文章系统解析 everything-claude-code 项目的核心机制，包括 Agent 触发、Hooks 系统、Commands 调用等关键概念，帮助你理解这个 Claude Code 插件库是如何工作的。  一、项目概述ECC 是什么？everything-claude-code（简称 ECC）是一个 Claude C">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://bergaihub.github.io/img/avatar.png">
+<meta property="article:published_time" content="2026-04-15T14:00:28.000Z">
+<meta property="article:modified_time" content="2026-04-16T14:28:29.825Z">
+<meta property="article:author" content="BergAIhub">
+<meta property="article:tag" content="Agent开发,人工智能,AI助手,大语言模型">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://bergaihub.github.io/img/avatar.png"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "ECC项目深度解析",
+  "url": "https://bergaihub.github.io/2026/04/15/ECC%E9%A1%B9%E7%9B%AE%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/",
+  "image": "https://bergaihub.github.io/img/avatar.png",
+  "datePublished": "2026-04-15T14:00:28.000Z",
+  "dateModified": "2026-04-16T14:28:29.825Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "BergAIhub",
+      "url": "https://bergaihub.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://bergaihub.github.io/2026/04/15/ECC%E9%A1%B9%E7%9B%AE%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.5.4"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.1.0/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#3d2b1f')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#F2EDF7')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'ECC项目深度解析',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><style>
+/* 导航菜单字体放大 */
+#nav .menus_item a {
+  font-size: 18px !important;
+}
+/* 搜索按钮放大 */
+#search-button .site-page {
+  font-size: 18px !important;
+}
+/* 公告栏图标改为紫色 */
+.card-announcement .item-headline i {
+  color: #7B6B8A !important;
+}
+/* 关于页面视频背景 */
+.about-video-header {
+  position: relative;
+  width: 100%;
+  height: 60vh;
+  overflow: hidden;
+  margin-top: -60px;
+  margin-bottom: 20px;
+}
+.about-video-header video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.about-video-header .video-title {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  font-size: 32px;
+  font-weight: 700;
+  text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+  z-index: 10;
+}
+.about-video-header::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.3);
+}
+</style>
+<meta name="generator" content="Hexo 8.1.1"></head><body><div class="bg-animation" id="web_bg" style="background-color: #F8F5FA;"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/agent-notes/"><i class="fa-fw fas fa-robot"></i><span> Agent学习笔记</span></a></div><div class="menus_item"><a class="site-page" href="/categories/portfolio/"><i class="fa-fw fas fa-star"></i><span> 作品集</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于我</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">BergAIhub</span></a><a class="nav-page-title" href="/"><span class="site-name">ECC项目深度解析</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/agent-notes/"><i class="fa-fw fas fa-robot"></i><span> Agent学习笔记</span></a></div><div class="menus_item"><a class="site-page" href="/categories/portfolio/"><i class="fa-fw fas fa-star"></i><span> 作品集</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于我</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">ECC项目深度解析</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-04-15T14:00:28.000Z" title="发表于 2026-04-15 22:00:28">2026-04-15</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-16T14:28:29.825Z" title="更新于 2026-04-16 22:28:29">2026-04-16</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/agent-notes/">Agent学习笔记</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><h1 id="Everything-Claude-Code-ECC-深度解析"><a href="#Everything-Claude-Code-ECC-深度解析" class="headerlink" title="Everything Claude Code (ECC) 深度解析"></a>Everything Claude Code (ECC) 深度解析</h1><blockquote>
+<p>这篇文章系统解析 everything-claude-code 项目的核心机制，包括 Agent 触发、Hooks 系统、Commands 调用等关键概念，帮助你理解这个 Claude Code 插件库是如何工作的。</p>
+</blockquote>
+<h2 id="一、项目概述"><a href="#一、项目概述" class="headerlink" title="一、项目概述"></a>一、项目概述</h2><h3 id="ECC-是什么？"><a href="#ECC-是什么？" class="headerlink" title="ECC 是什么？"></a>ECC 是什么？</h3><p>everything-claude-code（简称 ECC）是一个 <strong>Claude Code 插件库</strong>，提供了大量开箱即用的 AI 编程工具。</p>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>数量</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Agents</strong></td>
+<td>47个</td>
+<td>专业子代理（代码审查、架构设计、测试等）</td>
+</tr>
+<tr>
+<td><strong>Skills</strong></td>
+<td>181个</td>
+<td>工作流技能（TDD、安全审查、前端模式等）</td>
+</tr>
+<tr>
+<td><strong>Commands</strong></td>
+<td>79个</td>
+<td>斜杠命令（<code>/tdd</code>、<code>/plan</code> 等）</td>
+</tr>
+<tr>
+<td><strong>Hooks</strong></td>
+<td>多个</td>
+<td>自动化钩子（提交检查、格式化等）</td>
+</tr>
+<tr>
+<td><strong>Rules</strong></td>
+<td>多个</td>
+<td>编码规则（安全、测试、风格等）</td>
+</tr>
+<tr>
+<td><strong>MCP配置</strong></td>
+<td>14个</td>
+<td>外部服务集成</td>
+</tr>
+</tbody></table>
+<h3 id="安装后的效果对比"><a href="#安装后的效果对比" class="headerlink" title="安装后的效果对比"></a>安装后的效果对比</h3><p><strong>安装前：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">你: 帮我审查这段代码</span><br><span class="line">Claude: 我来看看...（普通审查）</span><br></pre></td></tr></table></figure>
+
+<p><strong>安装后：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">你: 帮我审查这段代码</span><br><span class="line">Claude: （自动调用 code-reviewer agent）</span><br><span class="line">        → 安全检查（SQL注入、XSS、硬编码密钥）</span><br><span class="line">        → 代码质量（大函数、深嵌套）</span><br><span class="line">        → React 模式检查</span><br><span class="line">        → 性能问题</span><br><span class="line">        → 输出结构化报告</span><br></pre></td></tr></table></figure>
+
+<h3 id="核心组件关系"><a href="#核心组件关系" class="headerlink" title="核心组件关系"></a>核心组件关系</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">项目/</span><br><span class="line">├── agents/          # 专业子代理（被 Agent tool 调用）</span><br><span class="line">├── skills/          # 工作流技能（被 Skill tool 调用）</span><br><span class="line">├── commands/        # 斜杠命令（用户输入 /xxx 触发）</span><br><span class="line">├── hooks/           # 自动化钩子（工具调用时触发）</span><br><span class="line">├── rules/           # 编码规则（始终生效）</span><br><span class="line">├── CLAUDE.md        # 项目指令（给 Claude 读）</span><br><span class="line">└── AGENTS.md        # Agent 列表和触发规则</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="二、CLAUDE-md-的作用"><a href="#二、CLAUDE-md-的作用" class="headerlink" title="二、CLAUDE.md 的作用"></a>二、CLAUDE.md 的作用</h2><h3 id="给谁看的？"><a href="#给谁看的？" class="headerlink" title="给谁看的？"></a>给谁看的？</h3><p><strong>CLAUDE.md 是给 Claude（AI）读的，不是给人类读的。</strong></p>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>给谁看</th>
+<th>你需要读吗</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>README.md</code></td>
+<td>人类</td>
+<td>✅ 需要，了解项目</td>
+</tr>
+<tr>
+<td><code>CLAUDE.md</code></td>
+<td>Claude</td>
+<td>❌ 不需要，AI 自己读</td>
+</tr>
+<tr>
+<td><code>AGENTS.md</code></td>
+<td>Claude</td>
+<td>❌ 不需要</td>
+</tr>
+<tr>
+<td><code>CONTRIBUTING.md</code></td>
+<td>人类</td>
+<td>✅ 如果要贡献代码</td>
+</tr>
+</tbody></table>
+<h3 id="文件位置与作用范围"><a href="#文件位置与作用范围" class="headerlink" title="文件位置与作用范围"></a>文件位置与作用范围</h3><table>
+<thead>
+<tr>
+<th>位置</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>项目/CLAUDE.md</code></td>
+<td>项目级指令（只对这个项目生效）</td>
+</tr>
+<tr>
+<td><code>~/.claude/CLAUDE.md</code></td>
+<td>全局指令（所有项目生效）</td>
+</tr>
+</tbody></table>
+<h3 id="实际效果"><a href="#实际效果" class="headerlink" title="实际效果"></a>实际效果</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">Claude Code 启动</span><br><span class="line">      ↓</span><br><span class="line">读取 CLAUDE.md</span><br><span class="line">      ↓</span><br><span class="line">知道：</span><br><span class="line">- 这是插件项目</span><br><span class="line">- 测试用 node tests/run-all.js</span><br><span class="line">- agents/ 存放子代理</span><br><span class="line">- skills/ 存放工作流</span><br><span class="line">- 文件命名用小写+连字符</span><br><span class="line">      ↓</span><br><span class="line">按照这些规则工作</span><br></pre></td></tr></table></figure>
+
+<p>简单说：<strong>CLAUDE.md &#x3D; 给 Claude 的”入职文档”</strong>，告诉 Claude 这个项目是什么、怎么干活、遵循什么规则。</p>
+<hr>
+<h2 id="三、Agent-触发机制"><a href="#三、Agent-触发机制" class="headerlink" title="三、Agent 触发机制"></a>三、Agent 触发机制</h2><h3 id="单-Agent-vs-多-Agent"><a href="#单-Agent-vs-多-Agent" class="headerlink" title="单 Agent vs 多 Agent"></a>单 Agent vs 多 Agent</h3><p><strong>单 Agent 场景</strong>：你直接和 Claude 对话，它就是主 agent。</p>
+<p><strong>多 Agent 场景</strong>：主 Claude 判断需要委派，调用 Agent tool 启动子 agent。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">用户请求 → 主 Claude → 判断需要委派 → 调用 Agent tool → 启动子 agent</span><br></pre></td></tr></table></figure>
+
+<h3 id="触发条件"><a href="#触发条件" class="headerlink" title="触发条件"></a>触发条件</h3><p>Agent 不会自动触发，需要满足以下条件之一：</p>
+<table>
+<thead>
+<tr>
+<th>条件</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>description 匹配</strong></td>
+<td>agent 的 <code>description</code> 字段包含关键词如 “Use PROACTIVELY when…”</td>
+</tr>
+<tr>
+<td><strong>AGENTS.md 引导</strong></td>
+<td>文件中明确写了 “复杂功能请求 → planner”</td>
+</tr>
+<tr>
+<td><strong>用户明确指定</strong></td>
+<td>“用 code-reviewer 审查这段代码”</td>
+</tr>
+<tr>
+<td><strong>规则强制</strong></td>
+<td>rules 中写了 “代码修改后必须使用 code-reviewer”</td>
+</tr>
+</tbody></table>
+<h3 id="Agent-文件格式"><a href="#Agent-文件格式" class="headerlink" title="Agent 文件格式"></a>Agent 文件格式</h3><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">name:</span> <span class="string">architect</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">Software</span> <span class="string">architecture</span> <span class="string">specialist.</span> <span class="string">Use</span> <span class="string">PROACTIVELY</span> <span class="string">when</span> <span class="string">planning</span> <span class="string">new</span> <span class="string">features,</span> <span class="string">refactoring</span> <span class="string">large</span> <span class="string">systems,</span> <span class="string">or</span> <span class="string">making</span> <span class="string">architectural</span> <span class="string">decisions.</span></span><br><span class="line"><span class="attr">tools:</span> [<span class="string">&quot;Read&quot;</span>, <span class="string">&quot;Grep&quot;</span>, <span class="string">&quot;Glob&quot;</span>]</span><br><span class="line"><span class="attr">model:</span> <span class="string">opus</span></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="meta"></span></span><br><span class="line"><span class="comment"># Agent 内容...</span></span><br></pre></td></tr></table></figure>
+
+<p>关键字段：</p>
+<ul>
+<li><code>name</code> - agent 名称</li>
+<li><code>description</code> - 描述，包含触发条件</li>
+<li><code>tools</code> - 可使用的工具</li>
+<li><code>model</code> - 使用的模型</li>
+</ul>
+<h3 id="触发流程图"><a href="#触发流程图" class="headerlink" title="触发流程图"></a>触发流程图</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────┐</span><br><span class="line">│                    Claude Code 启动                      │</span><br><span class="line">└─────────────────────────────────────────────────────────┘</span><br><span class="line">                          │</span><br><span class="line">                          ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────┐</span><br><span class="line">│  读取配置文件:                                            │</span><br><span class="line">│  - CLAUDE.md (项目指导)                                   │</span><br><span class="line">│  - AGENTS.md (agent 列表和触发规则)                        │</span><br><span class="line">│  - .claude/rules/*.md (规则)                              │</span><br><span class="line">└─────────────────────────────────────────────────────────┘</span><br><span class="line">                          │</span><br><span class="line">                          ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────┐</span><br><span class="line">│  用户输入: &quot;帮我设计一个高并发系统&quot;                          │</span><br><span class="line">└─────────────────────────────────────────────────────────┘</span><br><span class="line">                          │</span><br><span class="line">                          ▼</span><br><span class="line">┌─────────────────────────────────────────────────────────┐</span><br><span class="line">│  Claude 判断:                                            │</span><br><span class="line">│  - 匹配 AGENTS.md 中的 &quot;Architectural decision → architect&quot;│</span><br><span class="line">│  - 或者 description 中有 &quot;Use PROACTIVELY when...&quot;        │</span><br><span class="line">└─────────────────────────────────────────────────────────┘</span><br><span class="line">                          │</span><br><span class="line">              ┌───────────┴───────────┐</span><br><span class="line">              │                       │</span><br><span class="line">              ▼                       ▼</span><br><span class="line">┌─────────────────────┐   ┌─────────────────────┐</span><br><span class="line">│  不委派: 自己回答     │   │  委派: Agent tool   │</span><br><span class="line">│  (简单任务)          │   │  → 启动 architect   │</span><br><span class="line">└─────────────────────┘   └─────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="四、Hooks-系统"><a href="#四、Hooks-系统" class="headerlink" title="四、Hooks 系统"></a>四、Hooks 系统</h2><h3 id="Hooks-是什么？"><a href="#Hooks-是什么？" class="headerlink" title="Hooks 是什么？"></a>Hooks 是什么？</h3><p>Hooks 是 <strong>事件驱动的自动化脚本</strong>，在工具调用时自动触发。</p>
+<p><strong>关键点：钩子是通过工具调用触发的，不是通过提示词触发的。</strong></p>
+<h3 id="hooks-json-的位置"><a href="#hooks-json-的位置" class="headerlink" title="hooks.json 的位置"></a>hooks.json 的位置</h3><table>
+<thead>
+<tr>
+<th>位置</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>项目/hooks/hooks.json</code></td>
+<td>项目级钩子</td>
+</tr>
+<tr>
+<td><code>~/.claude/settings.json</code></td>
+<td>全局钩子配置</td>
+</tr>
+<tr>
+<td><code>~/.claude/settings.local.json</code></td>
+<td>本地覆盖配置</td>
+</tr>
+</tbody></table>
+<h3 id="钩子类型"><a href="#钩子类型" class="headerlink" title="钩子类型"></a>钩子类型</h3><table>
+<thead>
+<tr>
+<th>类型</th>
+<th>时机</th>
+<th>能做什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>PreToolUse</strong></td>
+<td>工具执行前</td>
+<td>可以阻止执行 (exit 2) 或警告</td>
+</tr>
+<tr>
+<td><strong>PostToolUse</strong></td>
+<td>工具执行后</td>
+<td>分析输出，但不能阻止</td>
+</tr>
+<tr>
+<td><strong>Stop</strong></td>
+<td>每次响应结束后</td>
+<td>格式化、通知等</td>
+</tr>
+<tr>
+<td><strong>SessionStart</strong></td>
+<td>会话开始时</td>
+<td>加载上下文</td>
+</tr>
+<tr>
+<td><strong>SessionEnd</strong></td>
+<td>会话结束时</td>
+<td>保存状态、清理</td>
+</tr>
+</tbody></table>
+<h3 id="触发流程"><a href="#触发流程" class="headerlink" title="触发流程"></a>触发流程</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">用户说任何话 → Claude 决定用什么工具 → 匹配 hooks.json 中的 matcher → 执行钩子</span><br></pre></td></tr></table></figure>
+
+<p><strong>用户说什么不重要</strong>，重要的是 <strong>Claude 调用了什么工具</strong>。</p>
+<h3 id="退出码含义"><a href="#退出码含义" class="headerlink" title="退出码含义"></a>退出码含义</h3><table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>0</code></td>
+<td>成功，继续执行</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td>阻止工具调用（仅 PreToolUse）</td>
+</tr>
+<tr>
+<td>其他非零</td>
+<td>错误，记录但不阻止</td>
+</tr>
+</tbody></table>
+<h3 id="实际钩子功能示例"><a href="#实际钩子功能示例" class="headerlink" title="实际钩子功能示例"></a>实际钩子功能示例</h3><table>
+<thead>
+<tr>
+<th>钩子</th>
+<th>触发时机</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>pre:bash:block-no-verify</code></td>
+<td>Bash 执行前</td>
+<td>阻止 <code>--no-verify</code> 绕过 git hooks</td>
+</tr>
+<tr>
+<td><code>pre:bash:commit-quality</code></td>
+<td>提交前</td>
+<td>检查 lint、commit 格式、敏感信息</td>
+</tr>
+<tr>
+<td><code>post:bash:command-log-audit</code></td>
+<td>Bash 执行后</td>
+<td>记录所有 bash 命令</td>
+</tr>
+<tr>
+<td><code>stop:format-typecheck</code></td>
+<td>响应结束时</td>
+<td>批量格式化和类型检查</td>
+</tr>
+<tr>
+<td><code>stop:desktop-notify</code></td>
+<td>响应结束时</td>
+<td>发送桌面通知</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="五、Commands-调用方式"><a href="#五、Commands-调用方式" class="headerlink" title="五、Commands 调用方式"></a>五、Commands 调用方式</h2><h3 id="怎么触发？"><a href="#怎么触发？" class="headerlink" title="怎么触发？"></a>怎么触发？</h3><p><strong>Commands 必须用户主动输入 <code>/命令名</code> 才触发。</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">用户输入: /agent-sort</span><br><span class="line">     ↓</span><br><span class="line">Claude Code 检测到斜杠命令</span><br><span class="line">     ↓</span><br><span class="line">读取 commands/agent-sort.md</span><br><span class="line">     ↓</span><br><span class="line">执行文件内容</span><br></pre></td></tr></table></figure>
+
+<h3 id="与-Skills、Agents、Hooks-的区别"><a href="#与-Skills、Agents、Hooks-的区别" class="headerlink" title="与 Skills、Agents、Hooks 的区别"></a>与 Skills、Agents、Hooks 的区别</h3><table>
+<thead>
+<tr>
+<th>类型</th>
+<th>谁触发</th>
+<th>怎么触发</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Command</strong></td>
+<td>用户</td>
+<td>用户输入 <code>/命令名</code></td>
+</tr>
+<tr>
+<td><strong>Skill</strong></td>
+<td>Claude 或用户</td>
+<td>Claude 主动调用，或用户 <code>/skill名</code></td>
+</tr>
+<tr>
+<td><strong>Agent</strong></td>
+<td>Claude</td>
+<td>Claude 通过 Agent tool 委派</td>
+</tr>
+<tr>
+<td><strong>Hook</strong></td>
+<td>系统</td>
+<td>工具调用时自动触发</td>
+</tr>
+<tr>
+<td><strong>Rule</strong></td>
+<td>始终生效</td>
+<td>作为 Claude 的行为准则</td>
+</tr>
+</tbody></table>
+<h3 id="ARGUMENTS-占位符"><a href="#ARGUMENTS-占位符" class="headerlink" title="$ARGUMENTS 占位符"></a>$ARGUMENTS 占位符</h3><figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">## Arguments</span></span><br><span class="line"></span><br><span class="line"><span class="code">`$ARGUMENTS`</span></span><br></pre></td></tr></table></figure>
+
+<p>用户输入的参数会替换它：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">用户输入: /agent-sort --verbose</span><br><span class="line">$ARGUMENTS 会被替换为: --verbose</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="六、推荐的通用-Agents"><a href="#六、推荐的通用-Agents" class="headerlink" title="六、推荐的通用 Agents"></a>六、推荐的通用 Agents</h2><h3 id="按推荐度排序"><a href="#按推荐度排序" class="headerlink" title="按推荐度排序"></a>按推荐度排序</h3><h4 id="1-planner（规划专家）⭐⭐⭐"><a href="#1-planner（规划专家）⭐⭐⭐" class="headerlink" title="1. planner（规划专家）⭐⭐⭐"></a>1. planner（规划专家）⭐⭐⭐</h4><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">name:</span> <span class="string">planner</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">Use</span> <span class="string">PROACTIVELY</span> <span class="string">when</span> <span class="string">users</span> <span class="string">request</span> <span class="string">feature</span> <span class="string">implementation,</span> <span class="string">architectural</span> <span class="string">changes,</span> <span class="string">or</span> <span class="string">complex</span> <span class="string">refactoring.</span></span><br><span class="line"><span class="attr">tools:</span> [<span class="string">&quot;Read&quot;</span>, <span class="string">&quot;Grep&quot;</span>, <span class="string">&quot;Glob&quot;</span>]</span><br><span class="line"><span class="attr">model:</span> <span class="string">opus</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>用途</strong>：复杂功能实现前，先规划再动手</p>
+<ul>
+<li>分析需求</li>
+<li>拆分步骤</li>
+<li>识别依赖和风险</li>
+<li>给出实现顺序</li>
+</ul>
+<h4 id="2-code-reviewer（代码审查专家）⭐⭐⭐"><a href="#2-code-reviewer（代码审查专家）⭐⭐⭐" class="headerlink" title="2. code-reviewer（代码审查专家）⭐⭐⭐"></a>2. code-reviewer（代码审查专家）⭐⭐⭐</h4><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">name:</span> <span class="string">code-reviewer</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">Use</span> <span class="string">immediately</span> <span class="string">after</span> <span class="string">writing</span> <span class="string">or</span> <span class="string">modifying</span> <span class="string">code.</span> <span class="string">MUST</span> <span class="string">BE</span> <span class="string">USED</span> <span class="string">for</span> <span class="string">all</span> <span class="string">code</span> <span class="string">changes.</span></span><br><span class="line"><span class="attr">tools:</span> [<span class="string">&quot;Read&quot;</span>, <span class="string">&quot;Grep&quot;</span>, <span class="string">&quot;Glob&quot;</span>, <span class="string">&quot;Bash&quot;</span>]</span><br><span class="line"><span class="attr">model:</span> <span class="string">sonnet</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>用途</strong>：写完代码后自动审查</p>
+<ul>
+<li>安全检查（SQL注入、XSS、硬编码密钥）</li>
+<li>代码质量（大函数、深嵌套、错误处理）</li>
+<li>React&#x2F;Next.js 模式检查</li>
+<li>性能问题</li>
+</ul>
+<h4 id="3-tdd-guide（测试驱动开发专家）⭐⭐⭐"><a href="#3-tdd-guide（测试驱动开发专家）⭐⭐⭐" class="headerlink" title="3. tdd-guide（测试驱动开发专家）⭐⭐⭐"></a>3. tdd-guide（测试驱动开发专家）⭐⭐⭐</h4><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">name:</span> <span class="string">tdd-guide</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">Use</span> <span class="string">PROACTIVELY</span> <span class="string">when</span> <span class="string">writing</span> <span class="string">new</span> <span class="string">features,</span> <span class="string">fixing</span> <span class="string">bugs,</span> <span class="string">or</span> <span class="string">refactoring</span> <span class="string">code.</span></span><br><span class="line"><span class="attr">tools:</span> [<span class="string">&quot;Read&quot;</span>, <span class="string">&quot;Write&quot;</span>, <span class="string">&quot;Edit&quot;</span>, <span class="string">&quot;Bash&quot;</span>, <span class="string">&quot;Grep&quot;</span>]</span><br><span class="line"><span class="attr">model:</span> <span class="string">sonnet</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>用途</strong>：先写测试再写代码</p>
+<ul>
+<li>Red-Green-Refactor 循环</li>
+<li>确保 80%+ 覆盖率</li>
+<li>边界情况测试</li>
+</ul>
+<h4 id="4-code-explorer（代码探索专家）⭐⭐⭐"><a href="#4-code-explorer（代码探索专家）⭐⭐⭐" class="headerlink" title="4. code-explorer（代码探索专家）⭐⭐⭐"></a>4. code-explorer（代码探索专家）⭐⭐⭐</h4><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">name:</span> <span class="string">code-explorer</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">Deeply</span> <span class="string">analyzes</span> <span class="string">existing</span> <span class="string">codebase</span> <span class="string">features</span> <span class="string">by</span> <span class="string">tracing</span> <span class="string">execution</span> <span class="string">paths,</span> <span class="string">mapping</span> <span class="string">architecture</span> <span class="string">layers.</span></span><br><span class="line"><span class="attr">tools:</span> [<span class="string">Read</span>, <span class="string">Grep</span>, <span class="string">Glob</span>, <span class="string">Bash</span>]</span><br><span class="line"><span class="attr">model:</span> <span class="string">sonnet</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>用途</strong>：深度分析现有代码</p>
+<ul>
+<li>发现入口点</li>
+<li>追踪执行路径</li>
+<li>映射架构层</li>
+<li>识别模式和依赖</li>
+</ul>
+<h4 id="5-architect（架构设计专家）⭐⭐"><a href="#5-architect（架构设计专家）⭐⭐" class="headerlink" title="5. architect（架构设计专家）⭐⭐"></a>5. architect（架构设计专家）⭐⭐</h4><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">name:</span> <span class="string">architect</span></span><br><span class="line"><span class="attr">description:</span> <span class="string">Use</span> <span class="string">PROACTIVELY</span> <span class="string">when</span> <span class="string">planning</span> <span class="string">new</span> <span class="string">features,</span> <span class="string">refactoring</span> <span class="string">large</span> <span class="string">systems,</span> <span class="string">or</span> <span class="string">making</span> <span class="string">architectural</span> <span class="string">decisions.</span></span><br><span class="line"><span class="attr">tools:</span> [<span class="string">&quot;Read&quot;</span>, <span class="string">&quot;Grep&quot;</span>, <span class="string">&quot;Glob&quot;</span>]</span><br><span class="line"><span class="attr">model:</span> <span class="string">opus</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>用途</strong>：系统架构设计</p>
+<ul>
+<li>可扩展性设计</li>
+<li>技术决策权衡</li>
+<li>架构决策记录（ADR）</li>
+</ul>
+<h4 id="6-security-reviewer（安全审查专家）⭐⭐"><a href="#6-security-reviewer（安全审查专家）⭐⭐" class="headerlink" title="6. security-reviewer（安全审查专家）⭐⭐"></a>6. security-reviewer（安全审查专家）⭐⭐</h4><p><strong>用途</strong>：提交前安全检查</p>
+<ul>
+<li>漏洞检测</li>
+<li>敏感数据暴露</li>
+<li>认证授权问题</li>
+</ul>
+<hr>
+<h2 id="七、总结"><a href="#七、总结" class="headerlink" title="七、总结"></a>七、总结</h2><h3 id="ECC-的核心价值"><a href="#ECC-的核心价值" class="headerlink" title="ECC 的核心价值"></a>ECC 的核心价值</h3><ol>
+<li><strong>专业化</strong> - 47 个专业 agent，每个都有明确的职责和触发条件</li>
+<li><strong>自动化</strong> - Hooks 系统在工具调用时自动执行检查</li>
+<li><strong>规范化</strong> - Rules 系统确保代码质量和安全</li>
+<li><strong>可扩展</strong> - Skills 系统支持自定义工作流</li>
+</ol>
+<h3 id="安装建议"><a href="#安装建议" class="headerlink" title="安装建议"></a>安装建议</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 克隆项目</span></span><br><span class="line">git <span class="built_in">clone</span> https://github.com/affaan-m/everything-claude-code</span><br><span class="line"></span><br><span class="line"><span class="comment"># 运行安装脚本</span></span><br><span class="line">./install.sh  <span class="comment"># Linux/macOS</span></span><br><span class="line">./install.ps1 <span class="comment"># Windows</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="使用建议"><a href="#使用建议" class="headerlink" title="使用建议"></a>使用建议</h3><ol>
+<li><strong>常用三件套</strong>：<code>planner</code> → <code>tdd-guide</code> → <code>code-reviewer</code></li>
+<li><strong>理解大项目</strong>：<code>code-explorer</code> + <code>code-architect</code></li>
+<li><strong>架构决策</strong>：<code>architect</code></li>
+<li><strong>安全敏感代码</strong>：<code>security-reviewer</code></li>
+</ol>
+<h3 id="核心概念速查"><a href="#核心概念速查" class="headerlink" title="核心概念速查"></a>核心概念速查</h3><table>
+<thead>
+<tr>
+<th>概念</th>
+<th>触发方式</th>
+<th>给谁用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Agent</td>
+<td>Agent tool 委派</td>
+<td>Claude</td>
+</tr>
+<tr>
+<td>Skill</td>
+<td>Skill tool 或 <code>/skill名</code></td>
+<td>Claude 或用户</td>
+</tr>
+<tr>
+<td>Command</td>
+<td>用户输入 <code>/命令名</code></td>
+<td>用户</td>
+</tr>
+<tr>
+<td>Hook</td>
+<td>工具调用时自动触发</td>
+<td>系统</td>
+</tr>
+<tr>
+<td>Rule</td>
+<td>始终生效</td>
+<td>Claude</td>
+</tr>
+<tr>
+<td>CLAUDE.md</td>
+<td>Claude 启动时自动读取</td>
+<td>Claude</td>
+</tr>
+</tbody></table>
+<hr>
+<p>ECC 本质上是一个”增强包”，让你的 Claude Code 变得更强大、更专业。就像给 VS Code 装插件一样，给 Claude Code 装这个插件，就能获得 47 个专业 agent、自动化钩子、规范化工作流等能力。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://bergaihub.github.io">BergAIhub</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://bergaihub.github.io/2026/04/15/ECC%E9%A1%B9%E7%9B%AE%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/">https://bergaihub.github.io/2026/04/15/ECC%E9%A1%B9%E7%9B%AE%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://bergaihub.github.io" target="_blank">BergAIhub</a>！</span></div></div><div class="tag_share"><div class="post-share"><div class="social-share" data-image="/img/avatar.png" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/04/16/AI%20Agent%E6%A0%B8%E5%BF%83%E6%9C%BA%E5%88%B6%E8%AF%A6%E8%A7%A3-%E4%BB%8ELoop%E5%88%B0MCP%E6%8F%92%E4%BB%B6%E7%B3%BB%E7%BB%9F/" title="AI Agent核心机制详解-从Loop到MCP插件系统"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">AI Agent核心机制详解-从Loop到MCP插件系统</div></div><div class="info-2"><div class="info-item-1">AI Agent核心机制详解：从Loop到MCP插件系统本文深入剖析 Claude Code 背后的19个核心机制，揭示一个生产级 AI Coding Agent 是如何从最简循环逐步演进为功能完备的智能体系统。 一、Agent Loop：最小可运行循环一切始于一个朴素的循环：接收用户输入，调用API，执行工具，返回结果，继续。这个设计看似简单，却蕴含了 Agent 架构的核心哲学。 LoopState 数据类承载了循环的全部状态： 12345@dataclassclass LoopState:    messages: list           # 对话历史    turn_count: int = 1      # 当前轮次    transition_reason: str | None = None  # 为何继续循环  我选择将状态显式化而非散落在全局变量中，是为了后续章节可以无缝扩展。run_one_turn() 函数实现了单轮执行逻辑： 12345678910111213def run_one_turn(state: LoopState) -&gt; bool:...</div></div></div></a><a class="pagination-related" href="/2026/04/15/Claude%20Code%E6%8A%80%E8%83%BD%E9%85%8D%E7%BD%AE%E4%B8%8E%E6%89%A7%E8%A1%8C%E6%9C%BA%E5%88%B6%E8%AF%A6%E8%A7%A3/" title="Claude Code技能配置与执行机制详解"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">Claude Code技能配置与执行机制详解</div></div><div class="info-2"><div class="info-item-1">Claude Code技能配置与执行机制详解 主要内容：详细讲解 baoyu-skills 的配置方法，包括 .env 文件的创建位置、API Key 配置、EXTEND.md 的作用、配置优先级，以及 Skill 如何检测选择 Provider。  最近在折腾 baoyu-skills 的时候，踩了不少配置相关的坑。这篇文章把我的实践经验和理解整理出来，希望能帮到同样在配置过程中困惑的朋友。 先说结论baoyu-skills 的配置其实并不复杂，但文档里有些细节说得不够清楚。核心就是两件事：  .env 文件需要手动创建，放在正确的目录 API Key 按需配置，不是所有 skill 都需要  下面展开说说我踩过的坑和理解到的机制。 .env 文件的那些事儿要自己创建吗？是的，需要手动创建。 这是我一开始最困惑的地方——我以为 skill 会自动生成配置模板，但其实不会。 .env 文件是你需要手动创建的纯文本文件，里面存放你的 API Key 等敏感配置。 放在哪个目录？这里有个关键点：.env 文件要放在特定位置，skill 脚本会自动查找。 baoyu-skills 的配...</div></div></div></a></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">BergAIhub</div><div class="author-info-description">Agent is all you need</div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/BergAIhub"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/BergAIhub" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content"><div style="text-align:center;padding:10px;background:linear-gradient(135deg,rgba(123,107,138,0.15),rgba(168,152,181,0.1));border-radius:8px;margin-bottom:8px;"><div style="font-size:11px;color:#000;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;font-weight:700;">Beijing · UTC+8</div><div id="beijing-time" style="font-family:monospace;font-size:18px;letter-spacing:2px;color:#333;font-weight:600;"></div></div><script>function updateTime(){const now=new Date(Date.now()+8*3600*1000);const y=now.getUTCFullYear();const m=String(now.getUTCMonth()+1).padStart(2,"0");const d=String(now.getUTCDate()).padStart(2,"0");const h=String(now.getUTCHours()).padStart(2,"0");const min=String(now.getUTCMinutes()).padStart(2,"0");const s=String(now.getUTCSeconds()).padStart(2,"0");const el=document.getElementById("beijing-time");if(el)el.innerText=`${y}.${m}.${d} ${h}:${min}:${s}`;}updateTime();setInterval(updateTime,1000);</script>你好，我是Berg，欢迎来到我的Blog！</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#Everything-Claude-Code-ECC-%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90"><span class="toc-number">1.</span> <span class="toc-text">Everything Claude Code (ECC) 深度解析</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E9%A1%B9%E7%9B%AE%E6%A6%82%E8%BF%B0"><span class="toc-number">1.1.</span> <span class="toc-text">一、项目概述</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#ECC-%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="toc-number">1.1.1.</span> <span class="toc-text">ECC 是什么？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%89%E8%A3%85%E5%90%8E%E7%9A%84%E6%95%88%E6%9E%9C%E5%AF%B9%E6%AF%94"><span class="toc-number">1.1.2.</span> <span class="toc-text">安装后的效果对比</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E7%BB%84%E4%BB%B6%E5%85%B3%E7%B3%BB"><span class="toc-number">1.1.3.</span> <span class="toc-text">核心组件关系</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81CLAUDE-md-%E7%9A%84%E4%BD%9C%E7%94%A8"><span class="toc-number">1.2.</span> <span class="toc-text">二、CLAUDE.md 的作用</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BB%99%E8%B0%81%E7%9C%8B%E7%9A%84%EF%BC%9F"><span class="toc-number">1.2.1.</span> <span class="toc-text">给谁看的？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%96%87%E4%BB%B6%E4%BD%8D%E7%BD%AE%E4%B8%8E%E4%BD%9C%E7%94%A8%E8%8C%83%E5%9B%B4"><span class="toc-number">1.2.2.</span> <span class="toc-text">文件位置与作用范围</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E9%99%85%E6%95%88%E6%9E%9C"><span class="toc-number">1.2.3.</span> <span class="toc-text">实际效果</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81Agent-%E8%A7%A6%E5%8F%91%E6%9C%BA%E5%88%B6"><span class="toc-number">1.3.</span> <span class="toc-text">三、Agent 触发机制</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8D%95-Agent-vs-%E5%A4%9A-Agent"><span class="toc-number">1.3.1.</span> <span class="toc-text">单 Agent vs 多 Agent</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%A7%A6%E5%8F%91%E6%9D%A1%E4%BB%B6"><span class="toc-number">1.3.2.</span> <span class="toc-text">触发条件</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Agent-%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F"><span class="toc-number">1.3.3.</span> <span class="toc-text">Agent 文件格式</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%A7%A6%E5%8F%91%E6%B5%81%E7%A8%8B%E5%9B%BE"><span class="toc-number">1.3.4.</span> <span class="toc-text">触发流程图</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%E3%80%81Hooks-%E7%B3%BB%E7%BB%9F"><span class="toc-number">1.4.</span> <span class="toc-text">四、Hooks 系统</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Hooks-%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="toc-number">1.4.1.</span> <span class="toc-text">Hooks 是什么？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#hooks-json-%E7%9A%84%E4%BD%8D%E7%BD%AE"><span class="toc-number">1.4.2.</span> <span class="toc-text">hooks.json 的位置</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%92%A9%E5%AD%90%E7%B1%BB%E5%9E%8B"><span class="toc-number">1.4.3.</span> <span class="toc-text">钩子类型</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%A7%A6%E5%8F%91%E6%B5%81%E7%A8%8B"><span class="toc-number">1.4.4.</span> <span class="toc-text">触发流程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%80%80%E5%87%BA%E7%A0%81%E5%90%AB%E4%B9%89"><span class="toc-number">1.4.5.</span> <span class="toc-text">退出码含义</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%9E%E9%99%85%E9%92%A9%E5%AD%90%E5%8A%9F%E8%83%BD%E7%A4%BA%E4%BE%8B"><span class="toc-number">1.4.6.</span> <span class="toc-text">实际钩子功能示例</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%E3%80%81Commands-%E8%B0%83%E7%94%A8%E6%96%B9%E5%BC%8F"><span class="toc-number">1.5.</span> <span class="toc-text">五、Commands 调用方式</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%80%8E%E4%B9%88%E8%A7%A6%E5%8F%91%EF%BC%9F"><span class="toc-number">1.5.1.</span> <span class="toc-text">怎么触发？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%8E-Skills%E3%80%81Agents%E3%80%81Hooks-%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="toc-number">1.5.2.</span> <span class="toc-text">与 Skills、Agents、Hooks 的区别</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#ARGUMENTS-%E5%8D%A0%E4%BD%8D%E7%AC%A6"><span class="toc-number">1.5.3.</span> <span class="toc-text">$ARGUMENTS 占位符</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AD%E3%80%81%E6%8E%A8%E8%8D%90%E7%9A%84%E9%80%9A%E7%94%A8-Agents"><span class="toc-number">1.6.</span> <span class="toc-text">六、推荐的通用 Agents</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%8C%89%E6%8E%A8%E8%8D%90%E5%BA%A6%E6%8E%92%E5%BA%8F"><span class="toc-number">1.6.1.</span> <span class="toc-text">按推荐度排序</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-planner%EF%BC%88%E8%A7%84%E5%88%92%E4%B8%93%E5%AE%B6%EF%BC%89%E2%AD%90%E2%AD%90%E2%AD%90"><span class="toc-number">1.6.1.1.</span> <span class="toc-text">1. planner（规划专家）⭐⭐⭐</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-code-reviewer%EF%BC%88%E4%BB%A3%E7%A0%81%E5%AE%A1%E6%9F%A5%E4%B8%93%E5%AE%B6%EF%BC%89%E2%AD%90%E2%AD%90%E2%AD%90"><span class="toc-number">1.6.1.2.</span> <span class="toc-text">2. code-reviewer（代码审查专家）⭐⭐⭐</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-tdd-guide%EF%BC%88%E6%B5%8B%E8%AF%95%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91%E4%B8%93%E5%AE%B6%EF%BC%89%E2%AD%90%E2%AD%90%E2%AD%90"><span class="toc-number">1.6.1.3.</span> <span class="toc-text">3. tdd-guide（测试驱动开发专家）⭐⭐⭐</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4-code-explorer%EF%BC%88%E4%BB%A3%E7%A0%81%E6%8E%A2%E7%B4%A2%E4%B8%93%E5%AE%B6%EF%BC%89%E2%AD%90%E2%AD%90%E2%AD%90"><span class="toc-number">1.6.1.4.</span> <span class="toc-text">4. code-explorer（代码探索专家）⭐⭐⭐</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#5-architect%EF%BC%88%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1%E4%B8%93%E5%AE%B6%EF%BC%89%E2%AD%90%E2%AD%90"><span class="toc-number">1.6.1.5.</span> <span class="toc-text">5. architect（架构设计专家）⭐⭐</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#6-security-reviewer%EF%BC%88%E5%AE%89%E5%85%A8%E5%AE%A1%E6%9F%A5%E4%B8%93%E5%AE%B6%EF%BC%89%E2%AD%90%E2%AD%90"><span class="toc-number">1.6.1.6.</span> <span class="toc-text">6. security-reviewer（安全审查专家）⭐⭐</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%83%E3%80%81%E6%80%BB%E7%BB%93"><span class="toc-number">1.7.</span> <span class="toc-text">七、总结</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#ECC-%E7%9A%84%E6%A0%B8%E5%BF%83%E4%BB%B7%E5%80%BC"><span class="toc-number">1.7.1.</span> <span class="toc-text">ECC 的核心价值</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%89%E8%A3%85%E5%BB%BA%E8%AE%AE"><span class="toc-number">1.7.2.</span> <span class="toc-text">安装建议</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BD%BF%E7%94%A8%E5%BB%BA%E8%AE%AE"><span class="toc-number">1.7.3.</span> <span class="toc-text">使用建议</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%A6%82%E5%BF%B5%E9%80%9F%E6%9F%A5"><span class="toc-number">1.7.4.</span> <span class="toc-text">核心概念速查</span></a></li></ol></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/16/AI%20Agent%E6%A0%B8%E5%BF%83%E6%9C%BA%E5%88%B6%E8%AF%A6%E8%A7%A3-%E4%BB%8ELoop%E5%88%B0MCP%E6%8F%92%E4%BB%B6%E7%B3%BB%E7%BB%9F/" title="AI Agent核心机制详解-从Loop到MCP插件系统">AI Agent核心机制详解-从Loop到MCP插件系统</a><time datetime="2026-04-16T14:00:28.000Z" title="发表于 2026-04-16 22:00:28">2026-04-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/16/Claude%20Code%E6%BA%90%E4%BB%A3%E7%A0%81%E6%9E%B6%E6%9E%84%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/" title="Claude Code源代码架构深度解析">Claude Code源代码架构深度解析</a><time datetime="2026-04-16T14:00:28.000Z" title="发表于 2026-04-16 22:00:28">2026-04-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/16/%E5%AD%A6%E4%B9%A0AI%20Agent%E5%BC%80%E5%8F%91%E7%9A%84%E6%AD%A3%E7%A1%AE%E5%A7%BF%E5%8A%BF-%E4%BB%8E%E7%90%86%E8%A7%A3%E5%88%B0%E5%AE%9E%E7%8E%B0/" title="学习AI Agent开发的正确姿势-从理解到实现">学习AI Agent开发的正确姿势-从理解到实现</a><time datetime="2026-04-16T14:00:28.000Z" title="发表于 2026-04-16 22:00:28">2026-04-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/15/Claude%20Code%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90-baoyu-skills%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/" title="Claude Code插件开发深度解析-baoyu-skills架构设计">Claude Code插件开发深度解析-baoyu-skills架构设计</a><time datetime="2026-04-15T14:00:28.000Z" title="发表于 2026-04-15 22:00:28">2026-04-15</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/15/Claude%20Code%E6%8A%80%E8%83%BD%E9%85%8D%E7%BD%AE%E4%B8%8E%E6%89%A7%E8%A1%8C%E6%9C%BA%E5%88%B6%E8%AF%A6%E8%A7%A3/" title="Claude Code技能配置与执行机制详解">Claude Code技能配置与执行机制详解</a><time datetime="2026-04-15T14:00:28.000Z" title="发表于 2026-04-15 22:00:28">2026-04-15</time></div></div></div></div></div></div></main><footer id="footer" style="background-image: url(/img/footer-bg.jpg);"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;BergAIhub</span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.5.4"></script><script src="/js/main.js?v=5.5.4"></script><div class="js-pjax"></div><script>
+if (window.location.pathname === '/about/') {
+  const header = document.querySelector('#page-header');
+  if (header) {
+    const videoHtml = `
+      <div class="about-video-header">
+        <video autoplay muted loop playsinline>
+          <source src="/img/about-bg.mp4" type="video/mp4">
+        </video>
+        <div class="video-title">关于我</div>
+      </div>
+    `;
+    header.insertAdjacentHTML('afterend', videoHtml);
+  }
+}
+</script>
+<script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索文章..." type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.5.4"></script></div></div></body></html>

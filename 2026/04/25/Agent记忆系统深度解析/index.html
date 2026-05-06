@@ -1,0 +1,268 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>Agent记忆系统深度解析 | YeeFayAI</title><meta name="author" content="YeeFayAI"><meta name="copyright" content="YeeFayAI"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#F2EDF7"><meta name="description" content="Agent记忆系统深度解析在研究Agent架构的过程中，记忆系统是最让我着迷的部分。它远比”存储对话历史”这个简单概念复杂得多，本质上是一个精密的上下文管理系统。这篇文章记录了我对Agent记忆系统的深度理解。 记忆系统在Agent架构中的定位Agent通常由四大核心模块构成：LLM（大语言模型）、工具层、记忆系统、推理和执行系统。其中，记忆系统扮演着”大脑海马体”的角色——它不负责思考，但负责为">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Agent记忆系统深度解析">
+<meta property="og:url" content="https://yeefayai.github.io/2026/04/25/Agent%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/index.html">
+<meta property="og:site_name" content="YeeFayAI">
+<meta property="og:description" content="Agent记忆系统深度解析在研究Agent架构的过程中，记忆系统是最让我着迷的部分。它远比”存储对话历史”这个简单概念复杂得多，本质上是一个精密的上下文管理系统。这篇文章记录了我对Agent记忆系统的深度理解。 记忆系统在Agent架构中的定位Agent通常由四大核心模块构成：LLM（大语言模型）、工具层、记忆系统、推理和执行系统。其中，记忆系统扮演着”大脑海马体”的角色——它不负责思考，但负责为">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://yeefayai.github.io/img/YeeFay.jpg">
+<meta property="article:published_time" content="2026-04-24T23:26:53.000Z">
+<meta property="article:modified_time" content="2026-05-06T17:25:49.541Z">
+<meta property="article:author" content="YeeFayAI">
+<meta property="article:tag" content="Agent开发,人工智能,AI助手,大语言模型">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://yeefayai.github.io/img/YeeFay.jpg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Agent记忆系统深度解析",
+  "url": "https://yeefayai.github.io/2026/04/25/Agent%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/",
+  "image": "https://yeefayai.github.io/img/YeeFay.jpg",
+  "datePublished": "2026-04-24T23:26:53.000Z",
+  "dateModified": "2026-05-06T17:25:49.541Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "YeeFayAI",
+      "url": "https://yeefayai.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/YeeFay.jpg"><link rel="canonical" href="https://yeefayai.github.io/2026/04/25/Agent%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.5.4"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.1.0/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#3d2b1f')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#F2EDF7')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'Agent记忆系统深度解析',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><style>
+/* UI style tweak */
+#nav .menus_item a {
+  font-size: 18px !important;
+}
+/* UI style tweak */
+#search-button .site-page {
+  font-size: 18px !important;
+}
+/* UI style tweak */
+.card-announcement .item-headline i {
+  color: #7B6B8A !important;
+}
+/* UI style tweak */
+.about-video-header {
+  position: relative;
+  width: 100%;
+  height: 60vh;
+  overflow: hidden;
+  margin-top: -60px;
+  margin-bottom: 20px;
+}
+.about-video-header video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.about-video-header .video-title {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  font-size: 32px;
+  font-weight: 700;
+  text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+  z-index: 10;
+}
+.about-video-header::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.3);
+}
+</style>
+<meta name="generator" content="Hexo 8.1.1"></head><body><div class="bg-animation" id="web_bg" style="background-color: #F8F5FA;"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/YeeFay.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 主页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/agent-notes/"><i class="fa-fw fas fa-robot"></i><span> Agent学习笔记</span></a></div><div class="menus_item"><a class="site-page" href="/categories/portfolio/"><i class="fa-fw fas fa-star"></i><span> 作品集</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于我</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">YeeFayAI</span></a><a class="nav-page-title" href="/"><span class="site-name">Agent记忆系统深度解析</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 主页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/agent-notes/"><i class="fa-fw fas fa-robot"></i><span> Agent学习笔记</span></a></div><div class="menus_item"><a class="site-page" href="/categories/portfolio/"><i class="fa-fw fas fa-star"></i><span> 作品集</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于我</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">Agent记忆系统深度解析</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-04-24T23:26:53.000Z" title="发表于 2026-04-25 07:26:53">2026-04-25</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-05-06T17:25:49.541Z" title="更新于 2026-05-07 01:25:49">2026-05-07</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/agent-notes/">Agent学习笔记</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><h1 id="Agent记忆系统深度解析"><a href="#Agent记忆系统深度解析" class="headerlink" title="Agent记忆系统深度解析"></a>Agent记忆系统深度解析</h1><p>在研究Agent架构的过程中，记忆系统是最让我着迷的部分。它远比”存储对话历史”这个简单概念复杂得多，本质上是一个精密的上下文管理系统。这篇文章记录了我对Agent记忆系统的深度理解。</p>
+<h2 id="记忆系统在Agent架构中的定位"><a href="#记忆系统在Agent架构中的定位" class="headerlink" title="记忆系统在Agent架构中的定位"></a>记忆系统在Agent架构中的定位</h2><p>Agent通常由四大核心模块构成：LLM（大语言模型）、工具层、记忆系统、推理和执行系统。其中，记忆系统扮演着”大脑海马体”的角色——它不负责思考，但负责为思考提供必要的上下文支撑。</p>
+<p>理解记忆系统的关键在于抓住一个本质：<strong>记忆系统的本质是上下文管理系统</strong>。它的核心任务是：在控制上下文长度的同时，保留关键信息，让Agent在任意时刻都能获得做出正确决策所需的背景知识。</p>
+<p>这个视角很重要。如果我们把记忆系统仅仅理解为”存储聊天记录”，就会错过很多设计上的精妙之处。</p>
+<h2 id="短期记忆：不是”聊天”那么简单"><a href="#短期记忆：不是”聊天”那么简单" class="headerlink" title="短期记忆：不是”聊天”那么简单"></a>短期记忆：不是”聊天”那么简单</h2><p>短期记忆的概念容易被误解。很多人会把它等同于”当前对话”，但这种理解过于粗糙。更准确的划分是三层结构：</p>
+<p><strong>即时工作记忆</strong>：这是Agent当前正在处理的信息，类似于人类工作记忆中的”焦点”。比如正在处理的一个复杂任务拆解、刚刚调用的工具返回结果、需要推理的中间步骤等。这些信息必须在上下文中保持活跃状态。</p>
+<p><strong>对话记忆</strong>：这才是我们通常理解的”聊天记录”，但它不是简单的消息堆叠。有效的对话记忆需要考虑对话结构——用户意图的演变、话题的切换、承诺与约束的积累等。</p>
+<p><strong>会话状态</strong>：这一层记录的是”我们进行到哪里了”。比如多步骤任务的完成进度、已尝试过的方案、当前遇到的问题等。会话状态确保Agent不会在长对话中迷失方向。</p>
+<p>这三层共同构成了短期记忆的完整图景。它们的生命周期都在单次会话内，但各自承担不同的职责。</p>
+<h2 id="短期记忆的管理策略"><a href="#短期记忆的管理策略" class="headerlink" title="短期记忆的管理策略"></a>短期记忆的管理策略</h2><p>短期记忆面临一个核心矛盾：上下文窗口是有限的，但对话可能无限延伸。解决方案不是简单的”截断”，而是一套精细的管理策略。</p>
+<p><strong>滑动窗口</strong>是最基础的策略，保留最近N轮对话。优点是简单可预测，缺点是无法处理”早期但重要”的信息。比如用户在对话开始时设定的约束条件，可能在滑动窗口中被丢弃。</p>
+<p><strong>摘要压缩</strong>是对滑动窗口的升级。当对话超过一定长度时，将早期对话压缩成摘要。摘要保留了信息的骨架，但丢失了细节。关键问题是谁来生成摘要、摘要保留什么、摘要如何与原始信息对应。</p>
+<p><strong>重要性打分</strong>引入了判断机制。不是简单地按时间顺序处理，而是给每段信息打分。高重要性信息优先保留，低重要性信息优先丢弃。难点在于重要性如何定义——是对当前任务的重要性，还是对用户偏好的重要性？这需要LLM的参与。</p>
+<p><strong>Token预算分配</strong>是一种更系统化的思路。把上下文窗口看作一个资源池，不同类型的信息竞争这个池子。比如：10%给系统提示，30%给工作记忆，40%给对话历史，20%给检索到的长期记忆。这种预算制让上下文的使用更可控。</p>
+<p><strong>混合策略</strong>通常是实际系统的选择。比如：滑动窗口处理最近对话，摘要处理中期对话，重要性打分决定摘要的详细程度，Token预算约束整体结构。</p>
+<h2 id="长期记忆：远不止RAG"><a href="#长期记忆：远不止RAG" class="headerlink" title="长期记忆：远不止RAG"></a>长期记忆：远不止RAG</h2><p>提到长期记忆，很多人会立刻想到RAG（检索增强生成）。但长期记忆的内涵远比向量检索丰富。借鉴认知心理学的分类，长期记忆可以划分为三种类型：</p>
+<p><strong>语义记忆</strong>：存储的是”知识”。比如用户的职业背景、项目的技术栈、业务的规则约束。这类记忆的特点是相对稳定、可被陈述、跨会话复用。RAG处理的更多是这类记忆。</p>
+<p><strong>情景记忆</strong>：存储的是”经历”。比如上次对话中我们讨论了什么方案、用户当时表达了什么偏好、某个决策是怎么达成的。这类记忆与特定时空绑定，对个性化交互至关重要。</p>
+<p><strong>程序记忆</strong>：存储的是”偏好和模式”。比如用户习惯的代码风格、偏好的解释深度、常用的工具组合。这类记忆让Agent越用越顺手，形成某种程度的”用户模型”。</p>
+<p>理解这个分类很重要，因为不同类型的记忆需要不同的存储和检索策略。语义记忆适合向量检索，情景记忆需要时间索引，程序记忆则需要模式识别和更新机制。</p>
+<h2 id="长期记忆的存储方案"><a href="#长期记忆的存储方案" class="headerlink" title="长期记忆的存储方案"></a>长期记忆的存储方案</h2><p>不同类型的长期记忆适合不同的存储技术：</p>
+<p><strong>向量数据库</strong>是语义记忆的主流选择。文本被编码为向量，相似语义的信息在向量空间中距离相近。检索时，将查询编码为向量，找到最近的邻居。优势是语义检索能力强，劣势是精确匹配困难，且难以表达复杂关系。</p>
+<p><strong>知识图谱</strong>擅长表达实体之间的关系。比如”用户A在项目B中使用了技术C”，这种三元组结构天然适合推理。知识图谱可以作为向量数据库的补充，处理需要关系推理的场景。</p>
+<p><strong>结构化数据库</strong>处理精确信息。比如用户的配置参数、历史对话的统计指标、任务的执行记录。这类信息不适合向量模糊检索，需要精确的查询能力。</p>
+<p><strong>对话摘要库</strong>是情景记忆的载体。每次会话结束后，生成一个结构化的摘要，记录本次会话的关键信息。摘要库支持按时间、按主题检索，是跨会话连续性的重要保障。</p>
+<p><strong>用户画像存储</strong>维护用户维度的聚合信息。从历史交互中提取稳定的偏好、习惯、约束，形成用户画像。用户画像是程序记忆的主要形式，直接影响Agent的行为定制。</p>
+<h2 id="横向能力：让记忆系统运转起来"><a href="#横向能力：让记忆系统运转起来" class="headerlink" title="横向能力：让记忆系统运转起来"></a>横向能力：让记忆系统运转起来</h2><p>有了短期记忆和长期记忆的划分，还需要一套横向能力将它们串联起来。这些能力跨越记忆类型，是记忆系统的”神经系统”。</p>
+<p><strong>检索触发机制</strong>回答的是”什么时候去取记忆”。不是每轮对话都需要检索长期记忆，检索有成本。常见的触发条件包括：任务需要背景知识、检测到用户偏好相关话题、跨会话的连续性需求、上下文窗口紧张需要压缩等。更精细的系统会根据当前任务动态决定是否检索、检索什么、检索多深。</p>
+<p><strong>记忆整合策略</strong>回答的是”检索到的记忆如何与当前上下文融合”。简单的方式是把检索结果拼接到系统提示或上下文中。但更好的做法是根据检索结果的相关性和重要性，动态调整它们的位置和权重。整合不好，可能引入噪声；整合太好，可能让用户感觉被”监视”。</p>
+<p><strong>记忆更新与遗忘</strong>回答的是”记忆如何演进”。长期记忆不是一成不变的：用户的偏好可能变化，知识可能过时，情景记忆的重要性可能衰减。遗忘机制很关键——不是所有信息都值得永久保存。时间衰减、重要性阈值、冲突检测都是常见的遗忘策略。</p>
+<p><strong>跨会话持久化</strong>回答的是”记忆如何跨越对话边界”。会话结束不等于记忆消失。关键信息需要写入长期存储，下次会话开始时能够恢复上下文。持久化的粒度是设计决策：是每次会话写一条摘要，还是每个重要决策写一条记录？</p>
+<p><strong>记忆质量评估</strong>回答的是”记忆系统是否工作良好”。评估维度包括：检索准确率（检索到的记忆是否相关）、召回率（相关的记忆是否都被检索到）、时效性（记忆是否过时）、冲突率（记忆之间是否矛盾）。质量评估反馈到系统优化，形成闭环。</p>
+<h2 id="五个核心子问题"><a href="#五个核心子问题" class="headerlink" title="五个核心子问题"></a>五个核心子问题</h2><p>把记忆系统的设计归纳为五个核心问题，可以更清晰地把握系统架构：</p>
+<p><strong>记什么（Encoding）</strong>：不是所有信息都值得记忆。需要判断什么信息对未来的决策有价值。用户明确表达的偏好、重要的决策结论、罕见的错误案例，这些都是高价值信息。而闲聊内容、常识性信息、已经过时的状态，则可以忽略或遗忘。Encoding的质量直接决定了记忆库的信噪比。</p>
+<p><strong>怎么存（Storage）</strong>：选择合适的存储结构和位置。语义信息进向量库，关系信息进图谱，精确信息进关系数据库，偏好信息进用户画像。存储时要考虑索引策略，为将来的检索做准备。</p>
+<p><strong>什么时候取（Retrieval Trigger）</strong>：不是每轮对话都需要翻阅记忆。需要设计触发条件，平衡检索成本和收益。触发太频繁，浪费计算资源，可能引入噪声；触发太稀疏，错过重要背景，决策质量下降。</p>
+<p><strong>怎么取（Retrieval）</strong>：检索策略的设计。用什么查询去检索？向量相似度、关键词匹配、还是混合策略？检索结果如何排序？检索多少条？检索策略直接影响记忆的可用性。</p>
+<p><strong>怎么整合（Integration）</strong>：检索到的记忆如何融入当前上下文。放在什么位置？用什么格式呈现？如何避免与当前对话冲突？整合是记忆系统与LLM交互的最后一公里，设计不好会让检索成果白费。</p>
+<h2 id="写在最后"><a href="#写在最后" class="headerlink" title="写在最后"></a>写在最后</h2><p>记忆系统是Agent架构中最具挑战性的模块之一。它既需要技术深度——向量检索、图谱推理、存储优化；也需要产品智慧——什么该记、什么该忘、如何让用户感到自然而非被监控。</p>
+<p>理解记忆系统的关键是抓住”上下文管理”这个本质。所有的机制设计——短期记忆的分层、长期记忆的分类、检索触发的判断、整合策略的选择——都服务于一个目标：在有限的上下文窗口中，最大化保留对当前决策有价值的信息。</p>
+<p>这也是为什么记忆系统设计没有标准答案。不同的应用场景、不同的用户群体、不同的资源约束，都会导向不同的设计选择。但理解了底层逻辑，就能做出有依据的决策，而不是盲目跟风某个方案。</p>
+<p>Agent记忆系统的研究还远未成熟。随着上下文窗口的不断扩展、更强大的LLM涌现、新的存储技术出现，记忆系统的设计也在持续演进。保持对这个领域的关注，是深入理解Agent架构的必经之路。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://yeefayai.github.io">YeeFayAI</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://yeefayai.github.io/2026/04/25/Agent%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/">https://yeefayai.github.io/2026/04/25/Agent%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://yeefayai.github.io" target="_blank">YeeFayAI</a>！</span></div></div><div class="tag_share"><div class="post-share"><div class="social-share" data-image="/img/YeeFay.jpg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/04/26/%E4%BB%8E%E9%9B%B6%E6%9E%84%E5%BB%BAAI%E7%BC%96%E7%A8%8B%E4%BB%A3%E7%90%86%E6%A1%86%E6%9E%B6-learn-claude-code%E6%9E%B6%E6%9E%84%E8%A7%A3%E6%9E%90/" title="从零构建AI编程代理框架-learn-claude-code架构解析"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">从零构建AI编程代理框架-learn-claude-code架构解析</div></div><div class="info-2"><div class="info-item-1">从零构建AI编程代理框架：learn-claude-code 架构解析主要内容：本文深入分析 learn-claude-code 项目，一个从零开始构建的高完成度 coding agent harness 教学仓库。通过四阶段递进式架构设计，展示了如何用「模型负责思考，代码负责提供环境」的理念构建生产级 AI Agent 框架。 项目定位与核心理念在探索 AI Agent 开发时，我常遇到一个困惑：市面上的框架要么过于抽象，要么过于简单。直到我发现 learn-claude-code 这个项目——它从零开始构建一个高完成度的 coding agent harness（智能体框架），每一步都有清晰的教学目的。 这个项目有一个核心理念深深打动了我：模型负责思考，代码负责给模型提供工作环境。这意味着框架的职责不是替模型做决策，而是提供必要的工具、状态管理和执行环境，让模型能够在其中自主完成复杂任务。 四阶段架构详解项目采用渐进式教学设计，分为四个阶段，每阶段解决一类核心问题：    阶段 范围 核心主题 解决的问题    阶段1 s01-s06 核心单Agent Agent 如何运转？...</div></div></div></a><a class="pagination-related" href="/2026/04/24/LLM%20Wiki%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E8%A7%A3%E6%9E%90/" title="LLM Wiki底层逻辑解析"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">LLM Wiki底层逻辑解析</div></div><div class="info-2"><div class="info-item-1">LLM Wiki：让知识累积而非重复计算 本文探讨 LLM Wiki 系统的底层设计哲学，以及它与 Obsidian 笔记工具在知识管理理念上的深度共鸣。核心洞察：知识是网络，不是集合；编译比解释更高效。  从一个痛点说起我一直在思考一个问题：为什么大多数人放弃维护知识库？ 不是因为知识不重要，而是因为维护知识的成本太高。更新交叉引用、保持摘要最新、标注矛盾信息、维护一致性——这些”知识维护”的苦力工作，会随着知识库增长而指数级增加。 直到我理解了 LLM Wiki 的设计哲学，才发现这可能是知识管理的一个新范式。 Obsidian 的底层逻辑：知识是网络要理解 LLM Wiki，先要理解 Obsidian 的设计哲学。 Zettelkasten：卡片盒笔记法Obsidian 的核心思想来自德国社会学家 Niklas Luhmann。他用一套叫 Zettelkasten 的方法写了 70 多本书。 传统笔记是树状的： 1文件夹 → 子文件夹 → 文件 → 内容  Zettelkasten 是网状的： 1卡片 ←→ 卡片 ←→ 卡片  关键区别：传统笔记把知识”锁”在文件夹里，Ze...</div></div></div></a></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/YeeFay.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">YeeFayAI</div><div class="author-info-description">Agent is all you need</div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/YeeFayAI"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/YeeFayAI" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">Hello, I am YeeFay. Welcome to my blog!</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#Agent%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90"><span class="toc-number">1.</span> <span class="toc-text">Agent记忆系统深度解析</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F%E5%9C%A8Agent%E6%9E%B6%E6%9E%84%E4%B8%AD%E7%9A%84%E5%AE%9A%E4%BD%8D"><span class="toc-number">1.1.</span> <span class="toc-text">记忆系统在Agent架构中的定位</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9F%AD%E6%9C%9F%E8%AE%B0%E5%BF%86%EF%BC%9A%E4%B8%8D%E6%98%AF%E2%80%9D%E8%81%8A%E5%A4%A9%E2%80%9D%E9%82%A3%E4%B9%88%E7%AE%80%E5%8D%95"><span class="toc-number">1.2.</span> <span class="toc-text">短期记忆：不是”聊天”那么简单</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9F%AD%E6%9C%9F%E8%AE%B0%E5%BF%86%E7%9A%84%E7%AE%A1%E7%90%86%E7%AD%96%E7%95%A5"><span class="toc-number">1.3.</span> <span class="toc-text">短期记忆的管理策略</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%95%BF%E6%9C%9F%E8%AE%B0%E5%BF%86%EF%BC%9A%E8%BF%9C%E4%B8%8D%E6%AD%A2RAG"><span class="toc-number">1.4.</span> <span class="toc-text">长期记忆：远不止RAG</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%95%BF%E6%9C%9F%E8%AE%B0%E5%BF%86%E7%9A%84%E5%AD%98%E5%82%A8%E6%96%B9%E6%A1%88"><span class="toc-number">1.5.</span> <span class="toc-text">长期记忆的存储方案</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%A8%AA%E5%90%91%E8%83%BD%E5%8A%9B%EF%BC%9A%E8%AE%A9%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F%E8%BF%90%E8%BD%AC%E8%B5%B7%E6%9D%A5"><span class="toc-number">1.6.</span> <span class="toc-text">横向能力：让记忆系统运转起来</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%E4%B8%AA%E6%A0%B8%E5%BF%83%E5%AD%90%E9%97%AE%E9%A2%98"><span class="toc-number">1.7.</span> <span class="toc-text">五个核心子问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%86%99%E5%9C%A8%E6%9C%80%E5%90%8E"><span class="toc-number">1.8.</span> <span class="toc-text">写在最后</span></a></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/05/07/%E6%96%87%E4%BB%B6%E7%BC%96%E7%A0%81%E4%B8%8E%E7%A8%8B%E5%BA%8F%E6%89%A7%E8%A1%8C%E5%8E%9F%E7%90%86/" title="文件编码与程序执行原理">文件编码与程序执行原理</a><time datetime="2026-05-07T15:59:59.000Z" title="发表于 2026-05-07 23:59:59">2026-05-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/05/07/%E5%85%B3%E4%BA%8E%E4%BD%9C%E5%93%81%E9%9B%86/" title="关于作品集">关于作品集</a><time datetime="2026-05-06T20:57:55.000Z" title="发表于 2026-05-07 04:57:55">2026-05-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/05/06/%E7%AB%AF%E5%8F%A3%E4%B8%8E%E7%BD%91%E7%BB%9C%E9%80%9A%E4%BF%A1%E7%9A%84%E6%9C%AC%E8%B4%A8/" title="端口与网络通信的本质">端口与网络通信的本质</a><time datetime="2026-05-06T01:55:51.000Z" title="发表于 2026-05-06 09:55:51">2026-05-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/05/05/RAG%E6%A3%80%E7%B4%A2%E5%A2%9E%E5%BC%BA%E7%94%9F%E6%88%90%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/" title="RAG检索增强生成深度解析">RAG检索增强生成深度解析</a><time datetime="2026-05-05T06:53:47.000Z" title="发表于 2026-05-05 14:53:47">2026-05-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/05/04/Claude%20Code%E6%BA%90%E4%BB%A3%E7%A0%81%E6%9E%B6%E6%9E%84%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/" title="Claude Code源代码架构深度解析">Claude Code源代码架构深度解析</a><time datetime="2026-05-04T11:51:43.000Z" title="发表于 2026-05-04 19:51:43">2026-05-04</time></div></div></div></div></div></div></main><footer id="footer" style="background-image: url(/img/footer-bg.jpg);"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;YeeFayAI</span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.5.4"></script><script src="/js/main.js?v=5.5.4"></script><div class="js-pjax"></div><script>
+if (window.location.pathname === '/about/') {
+  const header = document.querySelector('#page-header');
+  if (header) {
+    const videoHtml = `
+      <div class="about-video-header">
+        <video autoplay muted loop playsinline>
+          <source src="/img/about-bg.mp4" type="video/mp4">
+        </video>
+        <div class="video-title">About Me</div>
+      </div>
+    `;
+    header.insertAdjacentHTML('afterend', videoHtml);
+  }
+}
+</script>
+<script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="Search articles..." type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.5.4"></script></div></div></body></html>

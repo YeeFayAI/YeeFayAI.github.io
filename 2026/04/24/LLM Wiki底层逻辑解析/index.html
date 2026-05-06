@@ -1,0 +1,449 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>LLM Wiki底层逻辑解析 | YeeFayAI</title><meta name="author" content="YeeFayAI"><meta name="copyright" content="YeeFayAI"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#F2EDF7"><meta name="description" content="LLM Wiki：让知识累积而非重复计算 本文探讨 LLM Wiki 系统的底层设计哲学，以及它与 Obsidian 笔记工具在知识管理理念上的深度共鸣。核心洞察：知识是网络，不是集合；编译比解释更高效。  从一个痛点说起我一直在思考一个问题：为什么大多数人放弃维护知识库？ 不是因为知识不重要，而是因为维护知识的成本太高。更新交叉引用、保持摘要最新、标注矛盾信息、维护一致性——这些”知识维护”的苦">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LLM Wiki底层逻辑解析">
+<meta property="og:url" content="https://yeefayai.github.io/2026/04/24/LLM%20Wiki%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E8%A7%A3%E6%9E%90/index.html">
+<meta property="og:site_name" content="YeeFayAI">
+<meta property="og:description" content="LLM Wiki：让知识累积而非重复计算 本文探讨 LLM Wiki 系统的底层设计哲学，以及它与 Obsidian 笔记工具在知识管理理念上的深度共鸣。核心洞察：知识是网络，不是集合；编译比解释更高效。  从一个痛点说起我一直在思考一个问题：为什么大多数人放弃维护知识库？ 不是因为知识不重要，而是因为维护知识的成本太高。更新交叉引用、保持摘要最新、标注矛盾信息、维护一致性——这些”知识维护”的苦">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://yeefayai.github.io/img/YeeFay.jpg">
+<meta property="article:published_time" content="2026-04-24T04:24:49.000Z">
+<meta property="article:modified_time" content="2026-05-06T17:25:49.550Z">
+<meta property="article:author" content="YeeFayAI">
+<meta property="article:tag" content="Agent开发,人工智能,AI助手,大语言模型">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://yeefayai.github.io/img/YeeFay.jpg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "LLM Wiki底层逻辑解析",
+  "url": "https://yeefayai.github.io/2026/04/24/LLM%20Wiki%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E8%A7%A3%E6%9E%90/",
+  "image": "https://yeefayai.github.io/img/YeeFay.jpg",
+  "datePublished": "2026-04-24T04:24:49.000Z",
+  "dateModified": "2026-05-06T17:25:49.550Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "YeeFayAI",
+      "url": "https://yeefayai.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/YeeFay.jpg"><link rel="canonical" href="https://yeefayai.github.io/2026/04/24/LLM%20Wiki%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E8%A7%A3%E6%9E%90/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.5.4"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.1.0/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#3d2b1f')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#F2EDF7')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'LLM Wiki底层逻辑解析',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><style>
+/* UI style tweak */
+#nav .menus_item a {
+  font-size: 18px !important;
+}
+/* UI style tweak */
+#search-button .site-page {
+  font-size: 18px !important;
+}
+/* UI style tweak */
+.card-announcement .item-headline i {
+  color: #7B6B8A !important;
+}
+/* UI style tweak */
+.about-video-header {
+  position: relative;
+  width: 100%;
+  height: 60vh;
+  overflow: hidden;
+  margin-top: -60px;
+  margin-bottom: 20px;
+}
+.about-video-header video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.about-video-header .video-title {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  font-size: 32px;
+  font-weight: 700;
+  text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+  z-index: 10;
+}
+.about-video-header::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.3);
+}
+</style>
+<meta name="generator" content="Hexo 8.1.1"></head><body><div class="bg-animation" id="web_bg" style="background-color: #F8F5FA;"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/YeeFay.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 主页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/agent-notes/"><i class="fa-fw fas fa-robot"></i><span> Agent学习笔记</span></a></div><div class="menus_item"><a class="site-page" href="/categories/portfolio/"><i class="fa-fw fas fa-star"></i><span> 作品集</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于我</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">YeeFayAI</span></a><a class="nav-page-title" href="/"><span class="site-name">LLM Wiki底层逻辑解析</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 主页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/agent-notes/"><i class="fa-fw fas fa-robot"></i><span> Agent学习笔记</span></a></div><div class="menus_item"><a class="site-page" href="/categories/portfolio/"><i class="fa-fw fas fa-star"></i><span> 作品集</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user"></i><span> 关于我</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">LLM Wiki底层逻辑解析</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-04-24T04:24:49.000Z" title="发表于 2026-04-24 12:24:49">2026-04-24</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-05-06T17:25:49.550Z" title="更新于 2026-05-07 01:25:49">2026-05-07</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/agent-notes/">Agent学习笔记</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><h1 id="LLM-Wiki：让知识累积而非重复计算"><a href="#LLM-Wiki：让知识累积而非重复计算" class="headerlink" title="LLM Wiki：让知识累积而非重复计算"></a>LLM Wiki：让知识累积而非重复计算</h1><blockquote>
+<p>本文探讨 LLM Wiki 系统的底层设计哲学，以及它与 Obsidian 笔记工具在知识管理理念上的深度共鸣。核心洞察：知识是网络，不是集合；编译比解释更高效。</p>
+</blockquote>
+<h2 id="从一个痛点说起"><a href="#从一个痛点说起" class="headerlink" title="从一个痛点说起"></a>从一个痛点说起</h2><p>我一直在思考一个问题：为什么大多数人放弃维护知识库？</p>
+<p>不是因为知识不重要，而是因为<strong>维护知识的成本太高</strong>。更新交叉引用、保持摘要最新、标注矛盾信息、维护一致性——这些”知识维护”的苦力工作，会随着知识库增长而指数级增加。</p>
+<p>直到我理解了 LLM Wiki 的设计哲学，才发现这可能是知识管理的一个新范式。</p>
+<h2 id="Obsidian-的底层逻辑：知识是网络"><a href="#Obsidian-的底层逻辑：知识是网络" class="headerlink" title="Obsidian 的底层逻辑：知识是网络"></a>Obsidian 的底层逻辑：知识是网络</h2><p>要理解 LLM Wiki，先要理解 Obsidian 的设计哲学。</p>
+<h3 id="Zettelkasten：卡片盒笔记法"><a href="#Zettelkasten：卡片盒笔记法" class="headerlink" title="Zettelkasten：卡片盒笔记法"></a>Zettelkasten：卡片盒笔记法</h3><p>Obsidian 的核心思想来自德国社会学家 Niklas Luhmann。他用一套叫 Zettelkasten 的方法写了 70 多本书。</p>
+<p>传统笔记是树状的：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">文件夹 → 子文件夹 → 文件 → 内容</span><br></pre></td></tr></table></figure>
+
+<p>Zettelkasten 是网状的：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">卡片 ←→ 卡片 ←→ 卡片</span><br></pre></td></tr></table></figure>
+
+<p>关键区别：传统笔记把知识”锁”在文件夹里，Zettelkasten 让知识通过链接形成网络。</p>
+<h3 id="Memex：关联的愿景"><a href="#Memex：关联的愿景" class="headerlink" title="Memex：关联的愿景"></a>Memex：关联的愿景</h3><p>1945 年，Vannevar Bush 在《As We May Think》中设想了一种叫 Memex 的设备：</p>
+<blockquote>
+<p>“人类的思维不是树状的，是跳跃的、关联的。”</p>
+</blockquote>
+<p>他设想 Memex 可以存储所有书籍、记录，最重要的是<strong>建立关联线索（trails）</strong>。</p>
+<p>Obsidian 就是数字化的 Memex。</p>
+<h3 id="技术实现的极简主义"><a href="#技术实现的极简主义" class="headerlink" title="技术实现的极简主义"></a>技术实现的极简主义</h3><p>Obsidian 的技术选择非常克制：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Obsidian = 本地 Markdown 文件 + 双向链接 + 图谱可视化</span><br></pre></td></tr></table></figure>
+
+<p>为什么用纯 Markdown？</p>
+<ul>
+<li>不依赖任何平台</li>
+<li>10 年后还能打开</li>
+<li>可以用任何工具编辑</li>
+<li>Git 友好</li>
+</ul>
+<p><strong>双向链接的本质</strong>：当你写 <code>[[概念A]]</code>，不仅创建了指向”概念A”的链接，”概念A”的页面也会自动显示谁链接了它。</p>
+<p>这打破了”文件夹”的限制，让知识形成<strong>网络</strong>而非<strong>树</strong>。</p>
+<h3 id="图谱视图的意义"><a href="#图谱视图的意义" class="headerlink" title="图谱视图的意义"></a>图谱视图的意义</h3><p>图谱不是炫技，是知识结构的可视化：</p>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>孤立节点</td>
+<td>没有连接的知识</td>
+</tr>
+<tr>
+<td>中心节点</td>
+<td>核心概念</td>
+</tr>
+<tr>
+<td>连线密度</td>
+<td>知识融合程度</td>
+</tr>
+</tbody></table>
+<h2 id="LLM-Wiki-的底层逻辑：编译大于解释"><a href="#LLM-Wiki-的底层逻辑：编译大于解释" class="headerlink" title="LLM Wiki 的底层逻辑：编译大于解释"></a>LLM Wiki 的底层逻辑：编译大于解释</h2><p>现在来看 LLM Wiki 的核心设计。</p>
+<h3 id="核心洞察：编译-vs-解释"><a href="#核心洞察：编译-vs-解释" class="headerlink" title="核心洞察：编译 vs 解释"></a>核心洞察：编译 vs 解释</h3><p>这是整个系统的关键：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>类比</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>传统 RAG</td>
+<td>解释型语言</td>
+<td>每次执行都重新解析</td>
+</tr>
+<tr>
+<td>LLM Wiki</td>
+<td>编译型语言</td>
+<td>一次编译，多次运行</td>
+</tr>
+</tbody></table>
+<p>传统 RAG 的工作方式：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">问题 → 向量检索 → 找到片段 → 拼接 → LLM 回答</span><br></pre></td></tr></table></figure>
+
+<p>每次问问题都要：</p>
+<ul>
+<li>重新理解片段</li>
+<li>重新建立关联</li>
+<li>重新发现矛盾</li>
+</ul>
+<p>LLM Wiki 的工作方式：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">问题 → 查索引 → 读页面 → 回答</span><br></pre></td></tr></table></figure>
+
+<p>因为知识已经”编译”好了：</p>
+<ul>
+<li>关联已经建立（双向链接）</li>
+<li>矛盾已经标注</li>
+<li>结构已经形成</li>
+</ul>
+<h3 id="三层架构"><a href="#三层架构" class="headerlink" title="三层架构"></a>三层架构</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────┐</span><br><span class="line">│              你（用户）                  │</span><br><span class="line">│         提问、探索、决策                 │</span><br><span class="line">└─────────────────────────────────────────┘</span><br><span class="line">                    ↕</span><br><span class="line">┌─────────────────────────────────────────┐</span><br><span class="line">│           Wiki（编译后的知识）            │</span><br><span class="line">│    结构化、互联、可检索、可演化           │</span><br><span class="line">└─────────────────────────────────────────┘</span><br><span class="line">                    ↕</span><br><span class="line">┌─────────────────────────────────────────┐</span><br><span class="line">│           Raw（源代码）                  │</span><br><span class="line">│    原始资料、不可变、真相来源             │</span><br><span class="line">└─────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p><strong>Raw 是 Source of Truth</strong>：原始资料不可变，Wiki 是”派生品”，可以重建。类比：源代码 vs 编译产物。</p>
+<p><strong>Wiki 是编译产物</strong>：一次处理，多次使用；结构化，易于检索。</p>
+<p><strong>CLAUDE.md 是编译器配置</strong>：告诉 LLM 怎么”编译”，定义规则、格式、流程。</p>
+<h3 id="为什么比-RAG-更好？"><a href="#为什么比-RAG-更好？" class="headerlink" title="为什么比 RAG 更好？"></a>为什么比 RAG 更好？</h3><p>RAG 的问题是<strong>没有累积</strong>。每次问问题都从零开始理解，知识不会沉淀。</p>
+<p>LLM Wiki 的优势是<strong>知识累积</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">第一次处理来源 → 创建概念页面、建立链接</span><br><span class="line">第二次处理来源 → 更新现有页面、发现矛盾</span><br><span class="line">第三次处理来源 → 深化理解、扩展网络</span><br></pre></td></tr></table></figure>
+
+<p>知识是<strong>累积</strong>的，不是<strong>重复计算</strong>的。</p>
+<h2 id="两个系统的共振"><a href="#两个系统的共振" class="headerlink" title="两个系统的共振"></a>两个系统的共振</h2><p>Obsidian 和 LLM Wiki 的底层逻辑是<strong>同构</strong>的：</p>
+<table>
+<thead>
+<tr>
+<th>Obsidian</th>
+<th>LLM Wiki</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>双向链接</td>
+<td>概念关联</td>
+</tr>
+<tr>
+<td>图谱视图</td>
+<td>知识网络</td>
+</tr>
+<tr>
+<td>本地 Markdown</td>
+<td>Raw 目录</td>
+</tr>
+<tr>
+<td>插件生态</td>
+<td>CLAUDE.md 配置</td>
+</tr>
+</tbody></table>
+<p>本质相同：<strong>把知识变成网络，让连接产生价值。</strong></p>
+<p>但有一个关键区别：</p>
+<table>
+<thead>
+<tr>
+<th>Obsidian</th>
+<th>LLM Wiki</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>你手动创建链接</td>
+<td>LLM 自动创建链接</td>
+</tr>
+<tr>
+<td>你维护知识网络</td>
+<td>LLM 维护知识网络</td>
+</tr>
+</tbody></table>
+<p>LLM Wiki 的创新：<strong>让 LLM 承担”知识维护”的苦力工作。</strong></p>
+<p>这就是为什么这个系统可行——人类放弃知识管理，往往不是因为知识本身不重要，而是因为维护知识的成本太高。LLM 把这个成本降到接近零。</p>
+<h2 id="更深一层的思考：知识的本质"><a href="#更深一层的思考：知识的本质" class="headerlink" title="更深一层的思考：知识的本质"></a>更深一层的思考：知识的本质</h2><h3 id="知识-≠-信息"><a href="#知识-≠-信息" class="headerlink" title="知识 ≠ 信息"></a>知识 ≠ 信息</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">知识 = 信息 + 结构 + 上下文</span><br></pre></td></tr></table></figure>
+
+<p>一个孤立的事实不是知识。只有当它：</p>
+<ul>
+<li>与其他事实关联</li>
+<li>有结构化的表达</li>
+<li>在上下文中被理解</li>
+</ul>
+<p>才成为知识。</p>
+<h3 id="LLM-Wiki-做了什么？"><a href="#LLM-Wiki-做了什么？" class="headerlink" title="LLM Wiki 做了什么？"></a>LLM Wiki 做了什么？</h3><p>它把信息变成了知识：</p>
+<table>
+<thead>
+<tr>
+<th>目录</th>
+<th>内容</th>
+<th>本质</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Raw</td>
+<td>原始、无结构</td>
+<td>信息</td>
+</tr>
+<tr>
+<td>Wiki</td>
+<td>结构化、互联</td>
+<td>知识</td>
+</tr>
+</tbody></table>
+<p>LLM 的角色是<strong>知识工程师</strong>：提取概念、建立关联、维护结构、发现矛盾。</p>
+<h3 id="知识的价值在于连接"><a href="#知识的价值在于连接" class="headerlink" title="知识的价值在于连接"></a>知识的价值在于连接</h3><blockquote>
+<p>一个孤立的知识点价值有限，但当它与 10 个其他知识点连接，它的价值指数增长。</p>
+</blockquote>
+<p>这就是为什么：</p>
+<ul>
+<li>Wikipedia 比一堆网页有价值</li>
+<li>教科书比一堆论文有价值</li>
+<li>LLM Wiki 比一堆文件有价值</li>
+</ul>
+<h2 id="触发机制：对话式而非自动化"><a href="#触发机制：对话式而非自动化" class="headerlink" title="触发机制：对话式而非自动化"></a>触发机制：对话式而非自动化</h2><p>一个常见的误解是 LLM Wiki 会自动监控文件变化。实际上：</p>
+<p><strong>没有自动触发，全靠你主动告诉 LLM。</strong></p>
+<p>这是一个<strong>对话式</strong>的系统，不是自动化的后台服务：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">你：&quot;处理 raw/xxx.md&quot;</span><br><span class="line">LLM：阅读、整理、创建页面、更新索引</span><br><span class="line"></span><br><span class="line">你：&quot;Agent 架构有哪些？&quot;</span><br><span class="line">LLM：查 wiki、读页面、回答问题</span><br><span class="line"></span><br><span class="line">你：&quot;检查 wiki 健康&quot;</span><br><span class="line">LLM：扫描孤立页、发现矛盾、给出建议</span><br></pre></td></tr></table></figure>
+
+<p>为什么这样设计？</p>
+<ol>
+<li><strong>可控性</strong> — 你决定处理什么、什么时候处理</li>
+<li><strong>参与感</strong> — 你可以和 LLM 讨论每篇文章的要点</li>
+<li><strong>质量</strong> — LLM 整理时你可以纠正、补充</li>
+<li><strong>简单</strong> — 不需要配置任何自动化脚本</li>
+</ol>
+<h2 id="CLAUDE-md：给-LLM-的说明书"><a href="#CLAUDE-md：给-LLM-的说明书" class="headerlink" title="CLAUDE.md：给 LLM 的说明书"></a>CLAUDE.md：给 LLM 的说明书</h2><p>CLAUDE.md 是整个系统的”大脑”。当你在这个目录下和 LLM 对话时，LLM 会自动读取它，了解：</p>
+<ul>
+<li>目录结构是什么</li>
+<li>应该怎么工作</li>
+<li>页面格式是什么</li>
+<li>工作流程是什么</li>
+</ul>
+<p>类比：</p>
+<ul>
+<li><code>.gitignore</code> 告诉 git 忽略什么文件</li>
+<li><code>package.json</code> 告诉 npm 项目配置</li>
+<li><code>CLAUDE.md</code> 告诉 LLM 怎么工作</li>
+</ul>
+<p>这就是为什么知识库是<strong>目录级别</strong>的——每个项目可以有自己的 CLAUDE.md，互不干扰。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>LLM Wiki 的底层逻辑可以概括为三点：</p>
+<ol>
+<li><strong>编译大于解释</strong> — 提前把信息”编译”成结构化知识，而不是每次都重新理解</li>
+<li><strong>知识是网络</strong> — 概念通过链接形成网络，价值来自连接而非孤立存在</li>
+<li><strong>LLM 承担维护成本</strong> — 让人类专注于探索、思考、决策，苦力工作交给 LLM</li>
+</ol>
+<p>这个系统的本质，是让 LLM 成为你的知识管家。你负责获取信息、提出问题、做出决策；LLM 负责整理、关联、维护。</p>
+<p>知识管理的未来，可能就是这样：人机协作，各自发挥所长。</p>
+<hr>
+<p><em>写完这篇文章，我更清晰地理解了为什么这个系统让我兴奋——它解决了我长期以来维护知识库的痛点，而且方式优雅。希望对你也有启发。</em></p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://yeefayai.github.io">YeeFayAI</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://yeefayai.github.io/2026/04/24/LLM%20Wiki%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E8%A7%A3%E6%9E%90/">https://yeefayai.github.io/2026/04/24/LLM%20Wiki%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%E8%A7%A3%E6%9E%90/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://yeefayai.github.io" target="_blank">YeeFayAI</a>！</span></div></div><div class="tag_share"><div class="post-share"><div class="social-share" data-image="/img/YeeFay.jpg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/04/25/Agent%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/" title="Agent记忆系统深度解析"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">Agent记忆系统深度解析</div></div><div class="info-2"><div class="info-item-1">Agent记忆系统深度解析在研究Agent架构的过程中，记忆系统是最让我着迷的部分。它远比”存储对话历史”这个简单概念复杂得多，本质上是一个精密的上下文管理系统。这篇文章记录了我对Agent记忆系统的深度理解。 记忆系统在Agent架构中的定位Agent通常由四大核心模块构成：LLM（大语言模型）、工具层、记忆系统、推理和执行系统。其中，记忆系统扮演着”大脑海马体”的角色——它不负责思考，但负责为思考提供必要的上下文支撑。 理解记忆系统的关键在于抓住一个本质：记忆系统的本质是上下文管理系统。它的核心任务是：在控制上下文长度的同时，保留关键信息，让Agent在任意时刻都能获得做出正确决策所需的背景知识。 这个视角很重要。如果我们把记忆系统仅仅理解为”存储聊天记录”，就会错过很多设计上的精妙之处。 短期记忆：不是”聊天”那么简单短期记忆的概念容易被误解。很多人会把它等同于”当前对话”，但这种理解过于粗糙。更准确的划分是三层结构： 即时工作记忆：这是Agent当前正在处理的信息，类似于人类工作记忆中的”焦点”。比如正在处理的一个复杂任务拆解、刚刚调用的工具返回结果、需要推理的中间步骤等...</div></div></div></a><a class="pagination-related" href="/2026/04/23/Agent%E6%A0%B8%E5%BF%83%E6%9E%B6%E6%9E%84%E8%A7%A3%E6%9E%90/" title="Agent核心架构解析"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">Agent核心架构解析</div></div><div class="info-2"><div class="info-item-1">Agent核心架构解析：从感知到执行的完整闭环最近在深入研究AI Agent的底层架构，越来越觉得Agent的 design 其实是在模仿人类的认知过程。如果把Agent拆开来看，你会发现它和人类处理信息的方式惊人地相似——我们感知世界、记忆经历、做出决策、付诸行动。Agent也是一样。 今天我想从”感知-记忆-决策-执行”这四个核心模块入手，聊聊Agent的内部架构是如何运作的。 一张架构全景图在深入每个模块之前，先给一个整体视角： 12345678┌─────────────────────────────────────────────────────────────┐│                        Agent 架构                            │├─────────────┬─────────────┬─────────────┬─────────────────────┤│   感知模块   │   记忆模块   │   决策模块   │      执行模块        ││             │           ...</div></div></div></a></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/YeeFay.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">YeeFayAI</div><div class="author-info-description">Agent is all you need</div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/YeeFayAI"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/YeeFayAI" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">Hello, I am YeeFay. Welcome to my blog!</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#LLM-Wiki%EF%BC%9A%E8%AE%A9%E7%9F%A5%E8%AF%86%E7%B4%AF%E7%A7%AF%E8%80%8C%E9%9D%9E%E9%87%8D%E5%A4%8D%E8%AE%A1%E7%AE%97"><span class="toc-number">1.</span> <span class="toc-text">LLM Wiki：让知识累积而非重复计算</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%8E%E4%B8%80%E4%B8%AA%E7%97%9B%E7%82%B9%E8%AF%B4%E8%B5%B7"><span class="toc-number">1.1.</span> <span class="toc-text">从一个痛点说起</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Obsidian-%E7%9A%84%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%EF%BC%9A%E7%9F%A5%E8%AF%86%E6%98%AF%E7%BD%91%E7%BB%9C"><span class="toc-number">1.2.</span> <span class="toc-text">Obsidian 的底层逻辑：知识是网络</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Zettelkasten%EF%BC%9A%E5%8D%A1%E7%89%87%E7%9B%92%E7%AC%94%E8%AE%B0%E6%B3%95"><span class="toc-number">1.2.1.</span> <span class="toc-text">Zettelkasten：卡片盒笔记法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Memex%EF%BC%9A%E5%85%B3%E8%81%94%E7%9A%84%E6%84%BF%E6%99%AF"><span class="toc-number">1.2.2.</span> <span class="toc-text">Memex：关联的愿景</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%8A%80%E6%9C%AF%E5%AE%9E%E7%8E%B0%E7%9A%84%E6%9E%81%E7%AE%80%E4%B8%BB%E4%B9%89"><span class="toc-number">1.2.3.</span> <span class="toc-text">技术实现的极简主义</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%9B%BE%E8%B0%B1%E8%A7%86%E5%9B%BE%E7%9A%84%E6%84%8F%E4%B9%89"><span class="toc-number">1.2.4.</span> <span class="toc-text">图谱视图的意义</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#LLM-Wiki-%E7%9A%84%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91%EF%BC%9A%E7%BC%96%E8%AF%91%E5%A4%A7%E4%BA%8E%E8%A7%A3%E9%87%8A"><span class="toc-number">1.3.</span> <span class="toc-text">LLM Wiki 的底层逻辑：编译大于解释</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%B4%9E%E5%AF%9F%EF%BC%9A%E7%BC%96%E8%AF%91-vs-%E8%A7%A3%E9%87%8A"><span class="toc-number">1.3.1.</span> <span class="toc-text">核心洞察：编译 vs 解释</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%89%E5%B1%82%E6%9E%B6%E6%9E%84"><span class="toc-number">1.3.2.</span> <span class="toc-text">三层架构</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E6%AF%94-RAG-%E6%9B%B4%E5%A5%BD%EF%BC%9F"><span class="toc-number">1.3.3.</span> <span class="toc-text">为什么比 RAG 更好？</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%A4%E4%B8%AA%E7%B3%BB%E7%BB%9F%E7%9A%84%E5%85%B1%E6%8C%AF"><span class="toc-number">1.4.</span> <span class="toc-text">两个系统的共振</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9B%B4%E6%B7%B1%E4%B8%80%E5%B1%82%E7%9A%84%E6%80%9D%E8%80%83%EF%BC%9A%E7%9F%A5%E8%AF%86%E7%9A%84%E6%9C%AC%E8%B4%A8"><span class="toc-number">1.5.</span> <span class="toc-text">更深一层的思考：知识的本质</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%9F%A5%E8%AF%86-%E2%89%A0-%E4%BF%A1%E6%81%AF"><span class="toc-number">1.5.1.</span> <span class="toc-text">知识 ≠ 信息</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#LLM-Wiki-%E5%81%9A%E4%BA%86%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="toc-number">1.5.2.</span> <span class="toc-text">LLM Wiki 做了什么？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%9F%A5%E8%AF%86%E7%9A%84%E4%BB%B7%E5%80%BC%E5%9C%A8%E4%BA%8E%E8%BF%9E%E6%8E%A5"><span class="toc-number">1.5.3.</span> <span class="toc-text">知识的价值在于连接</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A7%A6%E5%8F%91%E6%9C%BA%E5%88%B6%EF%BC%9A%E5%AF%B9%E8%AF%9D%E5%BC%8F%E8%80%8C%E9%9D%9E%E8%87%AA%E5%8A%A8%E5%8C%96"><span class="toc-number">1.6.</span> <span class="toc-text">触发机制：对话式而非自动化</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#CLAUDE-md%EF%BC%9A%E7%BB%99-LLM-%E7%9A%84%E8%AF%B4%E6%98%8E%E4%B9%A6"><span class="toc-number">1.7.</span> <span class="toc-text">CLAUDE.md：给 LLM 的说明书</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93"><span class="toc-number">1.8.</span> <span class="toc-text">总结</span></a></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/05/07/%E6%96%87%E4%BB%B6%E7%BC%96%E7%A0%81%E4%B8%8E%E7%A8%8B%E5%BA%8F%E6%89%A7%E8%A1%8C%E5%8E%9F%E7%90%86/" title="文件编码与程序执行原理">文件编码与程序执行原理</a><time datetime="2026-05-07T15:59:59.000Z" title="发表于 2026-05-07 23:59:59">2026-05-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/05/07/%E5%85%B3%E4%BA%8E%E4%BD%9C%E5%93%81%E9%9B%86/" title="关于作品集">关于作品集</a><time datetime="2026-05-06T20:57:55.000Z" title="发表于 2026-05-07 04:57:55">2026-05-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/05/06/%E7%AB%AF%E5%8F%A3%E4%B8%8E%E7%BD%91%E7%BB%9C%E9%80%9A%E4%BF%A1%E7%9A%84%E6%9C%AC%E8%B4%A8/" title="端口与网络通信的本质">端口与网络通信的本质</a><time datetime="2026-05-06T01:55:51.000Z" title="发表于 2026-05-06 09:55:51">2026-05-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/05/05/RAG%E6%A3%80%E7%B4%A2%E5%A2%9E%E5%BC%BA%E7%94%9F%E6%88%90%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/" title="RAG检索增强生成深度解析">RAG检索增强生成深度解析</a><time datetime="2026-05-05T06:53:47.000Z" title="发表于 2026-05-05 14:53:47">2026-05-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/05/04/Claude%20Code%E6%BA%90%E4%BB%A3%E7%A0%81%E6%9E%B6%E6%9E%84%E6%B7%B1%E5%BA%A6%E8%A7%A3%E6%9E%90/" title="Claude Code源代码架构深度解析">Claude Code源代码架构深度解析</a><time datetime="2026-05-04T11:51:43.000Z" title="发表于 2026-05-04 19:51:43">2026-05-04</time></div></div></div></div></div></div></main><footer id="footer" style="background-image: url(/img/footer-bg.jpg);"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;YeeFayAI</span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.5.4"></script><script src="/js/main.js?v=5.5.4"></script><div class="js-pjax"></div><script>
+if (window.location.pathname === '/about/') {
+  const header = document.querySelector('#page-header');
+  if (header) {
+    const videoHtml = `
+      <div class="about-video-header">
+        <video autoplay muted loop playsinline>
+          <source src="/img/about-bg.mp4" type="video/mp4">
+        </video>
+        <div class="video-title">About Me</div>
+      </div>
+    `;
+    header.insertAdjacentHTML('afterend', videoHtml);
+  }
+}
+</script>
+<script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="Search articles..." type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.5.4"></script></div></div></body></html>
